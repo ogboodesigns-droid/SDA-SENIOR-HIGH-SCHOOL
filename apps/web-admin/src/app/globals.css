@@ -104,5 +104,6 @@ td input { min-width: 70px; }
 .timetable .tt-activity { background: #f8e6f0; color: var(--brand); font-weight: 600; }
 .tt-subject { font-weight: 700; text-transform: uppercase; font-size: .82rem; }
 .tt-lesson .muted { font-size: .8rem; margin: 2px 0 0; }
+.tt-combined { display: inline-block; margin-top: 3px; padding: 0 6px; border-radius: 999px; background: #e3f3e8; color: var(--ok); font-size: .75rem; font-weight: 600; }
 .tt-remove { background: none; border: none; color: var(--muted); padding: 0 3px; font-weight: 400; cursor: pointer; }
 .tt-remove:hover { color: var(--danger); }

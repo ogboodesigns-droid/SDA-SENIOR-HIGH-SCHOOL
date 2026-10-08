@@ -23,8 +23,8 @@ export class TimetableController {
     return row?.id ?? null;
   }
 
-  private slots(where: SQL | undefined): Promise<TimetableSlot[]> {
-    return this.db
+  private async slots(termId: string, where: SQL | undefined): Promise<TimetableSlot[]> {
+    const rows = await this.db
       .select({
         id: timetableEntries.id,
         dayOfWeek: timetableEntries.dayOfWeek,
@@ -35,6 +35,7 @@ export class TimetableController {
         subjectName: subjects.name,
         classId: classes.id,
         className: classes.name,
+        teacherId: classSubjects.teacherId,
         teacherName: users.fullName,
       })
       .from(timetableEntries)
@@ -45,9 +46,53 @@ export class TimetableController {
         and(eq(classSubjects.classId, timetableEntries.classId), eq(classSubjects.subjectId, timetableEntries.subjectId)),
       )
       .leftJoin(users, eq(users.id, classSubjects.teacherId))
-      .where(where)
-      .orderBy(asc(timetableEntries.dayOfWeek), asc(timetableEntries.startsAt))
-      .then((rows) => rows.map((r) => ({ ...r, startsAt: r.startsAt.slice(0, 5), endsAt: r.endsAt.slice(0, 5) })));
+      .where(and(eq(timetableEntries.termId, termId), where))
+      .orderBy(asc(timetableEntries.dayOfWeek), asc(timetableEntries.startsAt), asc(subjects.name));
+
+    // Combined lessons: the same teacher with the same subject at the same time in other classes.
+    const teacherIds = [...new Set(rows.map((r) => r.teacherId).filter((t): t is string => !!t))];
+    const others = teacherIds.length
+      ? await this.db
+          .select({
+            classId: timetableEntries.classId,
+            className: classes.name,
+            subjectId: timetableEntries.subjectId,
+            teacherId: classSubjects.teacherId,
+            dayOfWeek: timetableEntries.dayOfWeek,
+            startsAt: timetableEntries.startsAt,
+            endsAt: timetableEntries.endsAt,
+          })
+          .from(timetableEntries)
+          .innerJoin(classes, eq(classes.id, timetableEntries.classId))
+          .innerJoin(
+            classSubjects,
+            and(eq(classSubjects.classId, timetableEntries.classId), eq(classSubjects.subjectId, timetableEntries.subjectId)),
+          )
+          .where(and(eq(timetableEntries.termId, termId), inArray(classSubjects.teacherId, teacherIds)))
+      : [];
+
+    return rows.map(({ teacherId, ...r }) => ({
+      ...r,
+      startsAt: r.startsAt.slice(0, 5),
+      endsAt: r.endsAt.slice(0, 5),
+      combinedWith: teacherId
+        ? [
+            ...new Set(
+              others
+                .filter(
+                  (o) =>
+                    o.teacherId === teacherId &&
+                    o.subjectId === r.subjectId &&
+                    o.classId !== r.classId &&
+                    o.dayOfWeek === r.dayOfWeek &&
+                    o.startsAt < r.endsAt &&
+                    o.endsAt > r.startsAt,
+                )
+                .map((o) => o.className),
+            ),
+          ].sort()
+        : [],
+    }));
   }
 
   /**
@@ -59,15 +104,22 @@ export class TimetableController {
     const term = await this.termOrCurrent(termId);
     if (!term) return [];
     if (user.role === 'teacher') {
-      return this.slots(and(eq(timetableEntries.termId, term), eq(classSubjects.teacherId, user.id)));
+      // A combined lesson is one period for the teacher: "French — 1G/S 1 + 1H/E 2".
+      const mine = await this.slots(term, eq(classSubjects.teacherId, user.id));
+      const merged = new Map<string, TimetableSlot>();
+      for (const s of mine) {
+        const key = `${s.dayOfWeek}|${s.startsAt}|${s.subjectId}`;
+        const seen = merged.get(key);
+        if (seen) seen.className = [seen.className, s.className].sort().join(' + ');
+        else merged.set(key, { ...s, combinedWith: [] });
+      }
+      return [...merged.values()];
     }
     const student = await this.access.resolveOwnStudent(user, studentId);
     // Elective periods for other options in the class are left out.
     const subjectIds = await this.curriculum.subjectIdsForStudent(student.id);
     if (!subjectIds.length) return [];
-    return this.slots(
-      and(eq(timetableEntries.termId, term), eq(timetableEntries.classId, student.classId), inArray(timetableEntries.subjectId, subjectIds)),
-    );
+    return this.slots(term, and(eq(timetableEntries.classId, student.classId), inArray(timetableEntries.subjectId, subjectIds)));
   }
 
   @Get('class/:classId')
@@ -75,7 +127,7 @@ export class TimetableController {
     await this.access.assertCanReadClass(user, classId);
     const term = await this.termOrCurrent(termId);
     if (!term) return [];
-    return this.slots(and(eq(timetableEntries.termId, term), eq(timetableEntries.classId, classId)));
+    return this.slots(term, eq(timetableEntries.classId, classId));
   }
 
   @RequirePermissions('timetable:manage')
@@ -111,15 +163,18 @@ export class TimetableController {
     }
 
     if (assigned.teacherId) {
-      const [teacherClash] = await this.db
-        .select({ className: classes.name })
+      const busy = await this.db
+        .select({ className: classes.name, subjectId: timetableEntries.subjectId, subjectName: subjects.name })
         .from(timetableEntries)
         .innerJoin(classSubjects, and(eq(classSubjects.classId, timetableEntries.classId), eq(classSubjects.subjectId, timetableEntries.subjectId)))
         .innerJoin(classes, eq(classes.id, timetableEntries.classId))
-        .where(and(overlaps, eq(classSubjects.teacherId, assigned.teacherId), ne(timetableEntries.classId, body.classId)))
-        .limit(1);
-      // Combined lessons (e.g. French for two classes together) are real, so this only warns.
-      if (teacherClash) warnings.push(`The teacher is also timetabled with ${teacherClash.className} at this time (combined lesson?)`);
+        .innerJoin(subjects, eq(subjects.id, timetableEntries.subjectId))
+        .where(and(overlaps, eq(classSubjects.teacherId, assigned.teacherId), ne(timetableEntries.classId, body.classId)));
+      // The same subject at the same time is a combined lesson (one teacher, several classes together).
+      // A different subject means the teacher really would be in two places.
+      for (const b of busy) {
+        if (b.subjectId !== body.subjectId) warnings.push(`The teacher is also teaching ${b.subjectName} to ${b.className} at this time`);
+      }
     }
 
     const [row] = await this.db.insert(timetableEntries).values({ ...body, room: body.room ?? null }).returning({ id: timetableEntries.id });

@@ -187,7 +187,7 @@ export default function TimetablePage() {
     <>
       <PageHeader
         title="Timetable"
-        description="Pick a lesson for each period. Two electives for different option groups can share a period (e.g. GEOGRAPHY / COMPUTING); you'll be warned if an option takes both."
+        description="Pick a lesson for each period. Two electives for different option groups can share a period (e.g. GEOGRAPHY / COMPUTING). When a teacher has the same subject at the same time in several classes, it is one combined lesson."
         actions={
           <button className="secondary" onClick={() => setShowDay(!showDay)}>
             {showDay ? 'Hide school day' : 'School day & breaks'}
@@ -280,6 +280,13 @@ export default function TimetablePage() {
                                   {here.length > 1 && <span className="muted"> (Split)</span>}
                                 </div>
                                 <div className="muted">{here.map((s) => s.teacherName ?? 'No teacher').join(' / ')}</div>
+                                {here
+                                  .filter((s) => s.combinedWith.length)
+                                  .map((s) => (
+                                    <div key={s.id} className="tt-combined">
+                                      {here.length > 1 ? `${s.subjectName}: ` : ''}combined with {s.combinedWith.join(', ')}
+                                    </div>
+                                  ))}
                               </div>
                             )}
                             <AddLesson subjects={subjects.data ?? []} taken={here.map((s) => s.subjectId)} onAdd={(id) => add(d, p.startsAt, p.endsAt, id)} />

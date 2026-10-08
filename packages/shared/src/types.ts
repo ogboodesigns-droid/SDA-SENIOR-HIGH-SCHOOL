@@ -127,6 +127,11 @@ export interface TimetableSlot {
   classId: string;
   className: string;
   teacherName: string | null;
+  /**
+   * Other classes in the same lesson: the same teacher takes the same subject
+   * with them at the same time (e.g. French for 1G/S 1 and 1H/E 2 together).
+   */
+  combinedWith: string[];
 }
 
 export interface SubjectWithTeacher {

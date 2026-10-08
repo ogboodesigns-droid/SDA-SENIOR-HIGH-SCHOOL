@@ -101,6 +101,9 @@ export default function TimetableScreen() {
                           {isTeacher ? s.className : (s.teacherName ?? 'Teacher to be assigned')}
                           {s.room ? ` · ${s.room}` : ''}
                         </Body>
+                        {s.combinedWith.length > 0 && (
+                          <Body style={{ fontSize: 13, color: colors.ok, fontWeight: '600' }}>Combined class with {s.combinedWith.join(', ')}</Body>
+                        )}
                       </View>
                     ))
                   ) : (

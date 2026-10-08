@@ -259,6 +259,52 @@ describe('options, houses and semester assessment', () => {
     expect(count('Physical Education & Health')).toBe(1);
   });
 
+  it("Dodjivi's French for 1SC and 1HE2 is one combined lesson, not a clash", async () => {
+    const dodjivi = await insertUser(db, 'Dodjivi', 'teacher', 'dodjivi@test.local');
+    const french = await subjectId('FREN');
+    const [sc] = await db.select().from(schema.classes).where(eq(schema.classes.name, '1G/S 1'));
+    const [he2] = await db.select().from(schema.classes).where(eq(schema.classes.name, '1H/E 2'));
+    for (const c of [sc, he2]) {
+      await http().put('/api/v1/class-subjects').set(bearer(head)).send({ classId: c.id, subjectId: french, teacherId: dodjivi.id }).expect(200);
+    }
+
+    type Slot = { dayOfWeek: number; startsAt: string; subjectName: string; className: string; combinedWith: string[] };
+    const week = async (classId: string) =>
+      (await http().get(`/api/v1/timetable/class/${classId}?termId=${seed.term.id}`).set(bearer(head)).expect(200)).body as Slot[];
+    const wedP7 = (slots: Slot[]) => slots.find((s) => s.dayOfWeek === 3 && s.startsAt === '14:00' && s.subjectName === 'French');
+    expect(wedP7(await week(he2.id))?.combinedWith).toEqual(['1G/S 1']);
+    expect(wedP7(await week(sc.id))?.combinedWith).toEqual(['1H/E 2']);
+    // Lessons that aren't shared stay uncombined.
+    expect((await week(he2.id)).find((s) => s.subjectName === 'English Language')?.combinedWith).toEqual([]);
+
+    // Dodjivi's own week shows one French lesson for both classes, 4 periods in all.
+    const token = (await login(app, 'dodjivi@test.local')).accessToken;
+    const mine = (await http().get(`/api/v1/timetable/mine?termId=${seed.term.id}`).set(bearer(token)).expect(200)).body as Slot[];
+    expect(mine).toHaveLength(4);
+    expect(wedP7(mine)?.className).toBe('1G/S 1 + 1H/E 2');
+
+    // Adding French for a third class at the same time joins the combined lesson without a warning…
+    const [vis] = await db.select().from(schema.classes).where(eq(schema.classes.name, '1VIS 1'));
+    await http().put('/api/v1/class-subjects').set(bearer(head)).send({ classId: vis.id, subjectId: french, teacherId: dodjivi.id }).expect(200);
+    const joined = await http()
+      .post('/api/v1/timetable')
+      .set(bearer(head))
+      .send({ termId: seed.term.id, classId: vis.id, subjectId: french, dayOfWeek: 3, startsAt: '14:00', endsAt: '15:00' })
+      .expect(201);
+    expect(joined.body.warnings).toEqual([]);
+    expect(wedP7(await week(he2.id))?.combinedWith).toEqual(['1G/S 1', '1VIS 1']);
+
+    // …but a different subject for the same teacher at that time is a real double-booking.
+    const ict = await subjectId('ICT');
+    await http().put('/api/v1/class-subjects').set(bearer(head)).send({ classId: vis.id, subjectId: ict, teacherId: dodjivi.id }).expect(200);
+    const clash = await http()
+      .post('/api/v1/timetable')
+      .set(bearer(head))
+      .send({ termId: seed.term.id, classId: vis.id, subjectId: ict, dayOfWeek: 4, startsAt: '14:00', endsAt: '15:00' })
+      .expect(201);
+    expect(clash.body.warnings).toEqual(expect.arrayContaining(['The teacher is also teaching French to 1G/S 1 at this time']));
+  });
+
   it('houses: leadership awards points; house notices reach that house only', async () => {
     const houses = (await http().get('/api/v1/houses').set(bearer(studentArt)).expect(200)).body;
     const asokore = houses.find((h: { name: string }) => h.name === 'Asokore');
