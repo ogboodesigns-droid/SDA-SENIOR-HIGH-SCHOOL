@@ -5,6 +5,7 @@ import { count, eq, sql } from 'drizzle-orm';
 import { AccessModule } from './access/access.service';
 import { AcademicsModule, CurriculumModule } from './academics/academics.module';
 import { HousesModule } from './houses/houses.controller';
+import { ImportsModule } from './imports/imports.controller';
 import { AnnouncementsModule } from './announcements/announcements.controller';
 import { AssignmentsModule } from './assignments/assignments.controller';
 import { AuthModule } from './auth/auth.module';
@@ -70,6 +71,7 @@ class HealthController {
     AssignmentsModule,
     ResultsModule,
     HousesModule,
+    ImportsModule,
   ],
   controllers: [HealthController],
   providers: [

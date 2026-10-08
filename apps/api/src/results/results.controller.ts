@@ -44,5 +44,5 @@ export class ResultsController {
   }
 }
 
-@Module({ controllers: [ResultsController], providers: [ResultsService] })
+@Module({ controllers: [ResultsController], providers: [ResultsService], exports: [ResultsService] })
 export class ResultsModule {}

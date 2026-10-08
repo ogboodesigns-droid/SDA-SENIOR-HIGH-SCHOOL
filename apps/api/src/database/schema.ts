@@ -301,7 +301,27 @@ export const students = pgTable(
       .notNull()
       .unique()
       .references(() => users.id, { onDelete: 'cascade' }),
+    /** Admission number, e.g. SDA/25/0101 (school / year admitted / serial). Also the student's sign-in ID. */
     studentNumber: text('student_number').notNull().unique(),
+    /** BECE index number: 10 digits, unique per student; used to detect duplicate registrations. */
+    beceIndexNo: text('bece_index_no').unique(),
+    surname: text('surname'),
+    firstName: text('first_name'),
+    otherNames: text('other_names'),
+    gender: text('gender'),
+    nationality: text('nationality'),
+    ghanaCardNo: text('ghana_card_no'),
+    hometown: text('hometown'),
+    homeRegion: text('home_region'),
+    religion: text('religion'),
+    jhsAttended: text('jhs_attended'),
+    residentialStatus: text('residential_status'),
+    admissionDate: date('admission_date'),
+    residentialAddress: text('residential_address'),
+    gpsAddress: text('gps_address'),
+    emergencyContact: text('emergency_contact'),
+    /** Confidential: visible to school leadership only. */
+    medicalNotes: text('medical_notes'),
     classId: uuid('class_id')
       .notNull()
       .references(() => classes.id, { onDelete: 'restrict' }),
@@ -318,6 +338,15 @@ export const students = pgTable(
   },
   (t) => [index('students_class_idx').on(t.classId)],
 );
+
+/** Extra details for parent/guardian accounts, from the registration form. */
+export const guardianProfiles = pgTable('guardian_profiles', {
+  userId: uuid('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  occupation: text('occupation'),
+  altPhone: text('alt_phone'),
+});
 
 export const guardianStudents = pgTable(
   'guardian_students',

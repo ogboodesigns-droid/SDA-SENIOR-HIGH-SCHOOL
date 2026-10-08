@@ -10,7 +10,7 @@ import type {
   UserListItem,
 } from '@sda-shs/shared';
 import { InjectDb, type Database } from '../database/database.module';
-import { auditLogs, classes, guardianStudents, sessions, staffProfiles, students, users } from '../database/schema';
+import { auditLogs, classes, guardianProfiles, guardianStudents, sessions, staffProfiles, students, users } from '../database/schema';
 import type { AuthUser } from '../common/auth-user';
 import { AuditService } from '../common/audit.service';
 import { MeService } from '../auth/me.service';
@@ -100,7 +100,32 @@ export class UsersService {
             .where(eq(guardianStudents.studentId, me.student.id))
         : [];
     const [user] = await this.db.select({ status: users.status, createdAt: users.createdAt, lastLoginAt: users.lastLoginAt }).from(users).where(eq(users.id, id));
-    return { ...me, ...user, guardians };
+    // Registration details from the admission form (this page is for school leadership only).
+    const [registration] = me.student
+      ? await this.db
+          .select({
+            beceIndexNo: students.beceIndexNo,
+            gender: students.gender,
+            dateOfBirth: students.dateOfBirth,
+            nationality: students.nationality,
+            ghanaCardNo: students.ghanaCardNo,
+            hometown: students.hometown,
+            homeRegion: students.homeRegion,
+            religion: students.religion,
+            jhsAttended: students.jhsAttended,
+            residentialStatus: students.residentialStatus,
+            admissionDate: students.admissionDate,
+            residentialAddress: students.residentialAddress,
+            gpsAddress: students.gpsAddress,
+            emergencyContact: students.emergencyContact,
+            medicalNotes: students.medicalNotes,
+          })
+          .from(students)
+          .where(eq(students.id, me.student.id))
+      : [null];
+    const [guardianProfile] =
+      me.role === 'parent' ? await this.db.select().from(guardianProfiles).where(eq(guardianProfiles.userId, id)) : [null];
+    return { ...me, ...user, guardians, registration: registration ?? null, guardianProfile: guardianProfile ?? null };
   }
 
   /** An option must belong to the student's class (same programme and stream). */

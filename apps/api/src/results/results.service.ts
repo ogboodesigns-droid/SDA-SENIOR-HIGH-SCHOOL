@@ -126,15 +126,16 @@ export class ResultsService {
     const existing = new Map(
       (
         await this.db
-          .select({ studentId: results.studentId, scores: results.scores })
+          .select({ studentId: results.studentId, scores: results.scores, teacherComment: results.teacherComment })
           .from(results)
           .where(and(eq(results.termId, input.termId), eq(results.subjectId, input.subjectId), inArray(results.studentId, ids)))
-      ).map((r) => [r.studentId, r.scores]),
+      ).map((r) => [r.studentId, r]),
     );
 
     await this.db.transaction(async (tx) => {
       for (const e of input.entries) {
-        const merged: Record<string, number | null> = { ...(existing.get(e.studentId) ?? {}), ...e.scores };
+        const before = existing.get(e.studentId);
+        const merged: Record<string, number | null> = { ...(before?.scores ?? {}), ...e.scores };
         const scores = Object.fromEntries(components.filter((c) => merged[c.key] != null).map((c) => [c.key, merged[c.key] as number]));
         const summary = summariseScores(components, scores);
         const band = gradeFor(summary.total, bands);
@@ -147,7 +148,8 @@ export class ResultsService {
           grade: band.grade,
           gradePoint: band.points,
           remark: band.remark,
-          teacherComment: e.teacherComment ?? null,
+          // A sheet without a comment column keeps the comment already entered.
+          teacherComment: e.teacherComment === undefined ? (before?.teacherComment ?? null) : e.teacherComment,
           enteredBy: user.id,
           classId: input.classId,
         };

@@ -276,3 +276,75 @@ export interface PendingSubjectChoice {
   reason: 'timetable_clash' | 'drop_before_shs3';
   choices: SubjectRef[];
 }
+
+// ── Bulk imports ────────────────────────────────────────────────────────────
+
+export interface ImportIssue {
+  /** Spreadsheet row number as Excel shows it. */
+  row: number;
+  column: string | null;
+  message: string;
+}
+
+export interface StudentImportRow {
+  row: number;
+  admissionNo: string | null;
+  /** True when the system will (or did) generate the admission number. */
+  admissionNoGenerated: boolean;
+  fullName: string;
+  groupName: string | null;
+  guardianName: string | null;
+  guardianPhone: string | null;
+  /** The guardian already has an account (e.g. a sibling's parent) and will be linked to it. */
+  guardianExists: boolean;
+  ok: boolean;
+}
+
+export interface ImportCredential {
+  fullName: string;
+  role: 'student' | 'parent';
+  /** Admission number for students, phone number for parents. */
+  signInId: string;
+  temporaryPassword: string;
+  groupName: string | null;
+  /** For parents: their children in this import. */
+  children?: string[];
+}
+
+export interface StudentImportReport {
+  dryRun: boolean;
+  total: number;
+  valid: number;
+  rows: StudentImportRow[];
+  errors: ImportIssue[];
+  warnings: ImportIssue[];
+  /** Only after a real import: sign-in details to hand out. Shown once. */
+  credentials: ImportCredential[];
+  created: { students: number; parents: number; linkedToExistingParents: number };
+}
+
+export interface GradeImportRow {
+  row: number;
+  admissionNo: string;
+  fullName: string;
+  scores: Record<string, number | null>;
+  total: number | null;
+  grade: string | null;
+  complete: boolean;
+  /** The student already has marks for this subject and semester. */
+  hasExisting: boolean;
+  ok: boolean;
+}
+
+export interface GradeImportReport {
+  dryRun: boolean;
+  academicYear: string | null;
+  semester: string | null;
+  className: string | null;
+  subjectName: string | null;
+  total: number;
+  valid: number;
+  rows: GradeImportRow[];
+  errors: ImportIssue[];
+  saved: number;
+}

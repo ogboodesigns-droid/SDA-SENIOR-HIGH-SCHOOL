@@ -36,6 +36,13 @@
       "when": 1791455430973,
       "tag": "0004_dropped_subject",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791460771348,
+      "tag": "0005_student_registration",
+      "breakpoints": true
     }
   ]
 }
