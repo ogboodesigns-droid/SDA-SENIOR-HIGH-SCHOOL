@@ -218,7 +218,7 @@ export class StudentImportService {
       if (classRaw) {
         target = byCode.get(classRaw.toUpperCase().replace(/\s+/g, ''));
         if (!target) {
-          fail('Class', `"${classRaw}" is not a class and option on the subject combination list (e.g. 1BUS 1A, 1G/A 4, 1L1 1A)`);
+          fail('Class', `"${classRaw}" is not a class and option on the subject combination list (e.g. 1BUS 1A or 1 LANG 1A; see the Lists tab)`);
         } else {
           if (programme && !programmeMatches(programme, target.programmeName)) fail('Programme', `${target.groupName} is a ${target.programmeName} class`);
           if ([1, 2, 3].includes(form) && form !== target.form) fail('Form', `${target.groupName} is a form ${target.form} class`);

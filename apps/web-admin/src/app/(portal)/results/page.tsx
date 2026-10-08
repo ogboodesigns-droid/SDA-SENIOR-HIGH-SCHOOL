@@ -7,14 +7,16 @@ import {
   shortLabel,
   summariseScores,
   type AssessmentSchemesInput,
+  type GradeImportReport,
   type GradingScaleInput,
   type ResultRow,
   type StudentSummary,
   type TermSummary,
 } from '@sda-shs/shared';
-import { api, errorMessage, useApi } from '@/lib/api';
+import { api, download, errorMessage, upload, useApi } from '@/lib/api';
 import { useCan } from '@/lib/me';
 import { ClassSubjectPicker } from '@/components/class-subject-picker';
+import { IssueTable } from '@/components/import-issues';
 import { Alert, Card, Empty, Field, Loading, PageHeader } from '@/components/ui';
 
 interface Draft {
@@ -24,6 +26,130 @@ interface Draft {
 }
 
 const blank = (): Draft => ({ marks: {}, comment: '' });
+
+/** Download the class's score sheet (the school's Grade Import layout) and upload it back. */
+function ScoreSheet({ termId, classId, subjectId, onSaved }: { termId: string; classId: string; subjectId: string; onSaved: () => void }) {
+  const [file, setFile] = useState<File | null>(null);
+  const [overwrite, setOverwrite] = useState(false);
+  const [report, setReport] = useState<GradeImportReport | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setReport(null);
+    setError(null);
+  }, [termId, classId, subjectId]);
+
+  async function act(what: string, fn: () => Promise<void>) {
+    setBusy(what);
+    setError(null);
+    try {
+      await fn();
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const send = (dryRun: boolean) =>
+    act(dryRun ? 'check' : 'save', async () => {
+      const r = await upload<GradeImportReport>(`/imports/results?dryRun=${dryRun}&overwrite=${overwrite}`, file!);
+      setReport(r);
+      if (!dryRun) onSaved();
+    });
+
+  return (
+    <Card title="Score sheet (Excel)">
+      <p className="muted">
+        Download the score sheet for this class and subject, enter the marks in Excel and upload it here. Blank marks are left as they are, so a sheet can be
+        uploaded more than once during the semester.
+      </p>
+      <div className="row">
+        <button
+          className="secondary"
+          disabled={busy !== null}
+          onClick={() => act('template', () => download(`/imports/results/template?termId=${termId}&classId=${classId}&subjectId=${subjectId}`, 'score-sheet.xlsx'))}
+        >
+          {busy === 'template' ? 'Preparing…' : 'Download score sheet'}
+        </button>
+        <input
+          type="file"
+          accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          onChange={(e) => {
+            setFile(e.target.files?.[0] ?? null);
+            setReport(null);
+          }}
+        />
+        <label className="row" style={{ gap: 6 }}>
+          <input type="checkbox" checked={overwrite} onChange={(e) => (setOverwrite(e.target.checked), setReport(null))} />
+          Replace existing marks
+        </label>
+        <button disabled={!file || busy !== null} onClick={() => send(true)}>
+          {busy === 'check' ? 'Checking…' : 'Check sheet'}
+        </button>
+      </div>
+      <Alert>{error}</Alert>
+      {report && (
+        <>
+          <p>
+            {report.className} · {report.subjectName} · {report.academicYear} {report.semester}{' '}
+            <span className="badge ok">{report.valid} ready</span>{' '}
+            {report.total - report.valid > 0 && <span className="badge danger">{report.total - report.valid} with problems</span>}
+          </p>
+          {report.dryRun ? (
+            <button disabled={!report.valid || busy !== null} onClick={() => send(false)}>
+              {busy === 'save' ? 'Saving…' : `Save marks for ${report.valid} student(s)`}
+            </button>
+          ) : (
+            <Alert kind="success">
+              Saved marks for {report.saved} student(s). They stay private until the school publishes them.
+              {report.total - report.valid > 0 ? ` ${report.total - report.valid} row(s) with problems were skipped.` : ''}
+            </Alert>
+          )}
+          {report.errors.length > 0 && <IssueTable issues={report.errors} kind="error" />}
+          {report.dryRun && (
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Row</th>
+                    <th>Student</th>
+                    <th>Total</th>
+                    <th>Grade</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {report.rows.map((r) => (
+                    <tr key={r.row}>
+                      <td>{r.row}</td>
+                      <td>
+                        {r.fullName || '—'}
+                        <div className="muted">{r.admissionNo}</div>
+                      </td>
+                      <td>{r.total ?? '—'}</td>
+                      <td>{r.grade ?? (r.total !== null ? <span className="muted">incomplete</span> : '—')}</td>
+                      <td>
+                        {!r.ok ? (
+                          <span className="badge danger">Skipped</span>
+                        ) : r.hasExisting ? (
+                          <span className="badge warn">Replaces marks</span>
+                        ) : (
+                          <span className="badge ok">Ready</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
+    </Card>
+  );
+}
 
 function Results() {
   const params = useSearchParams();
@@ -139,6 +265,8 @@ function Results() {
         </div>
       </Card>
 
+      {ready && <ScoreSheet termId={termId} classId={pick.classId} subjectId={pick.subjectId} onSaved={() => void sheet.reload()} />}
+
       {ready && (
         <Card
           title="Mark sheet"
@@ -218,7 +346,7 @@ function Results() {
                           {anyMark && !summary.complete && <div className="field-hint">incomplete</div>}
                         </td>
                         <td>
-                          {anyMark && scale.data ? gradeFor(summary.total, scale.data.bands).grade : ''}
+                          {summary.complete && scale.data ? gradeFor(summary.total, scale.data.bands).grade : ''}
                           {saved?.published && (
                             <span className="badge ok" style={{ marginLeft: 6 }}>
                               published

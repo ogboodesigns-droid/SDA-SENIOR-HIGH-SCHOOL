@@ -17,6 +17,7 @@ The product specification is split into three releases. V1 is built in this repo
 | House system (§17) | ✅ (basic, from V2) | The four houses, membership, points table with history, house notices. Competitions and achievements to follow |
 | Assignments (§9) | ✅ | Text and file submissions, late flag, marking with feedback |
 | Results (§10) | ✅ | Marks per assessment mode (15/15/10/20/40), WASSCE grade and grade point, remark, comment, publish workflow (complete results only), semester average and aggregate. *Class position* is not computed until the school confirms its policy |
+| Bulk import (from V2) | ✅ | Student registration sheet with SDA/YY/NNNN admission numbers, guardian accounts, printable sign-in slips; score sheet download/upload |
 | School calendar (§16) | ✅ | Audience-targeted events |
 | Push notifications (§28) | ✅ | Expo push; targeted by school, role, form, programme, class, student and guardians |
 | Admin dashboard (§29) | ✅ (V1 scope) | People, classes & subjects, timetable, announcements, calendar, assignments, results, school profile, audit log |
@@ -36,7 +37,7 @@ The product specification is split into three releases. V1 is built in this repo
 - **Health / sick bay (§22):** notices and appointment requests; medical records only for authorised health staff, with field-level encryption.
 - **Parent portal extras (§20):** absence alerts, fees, teacher comments.
 - **Communication channels (§19):** moderated, one-way-by-default channels (class, house, department, club, SRC) following safeguarding policy; no unsolicited private student–teacher messaging.
-- **Infrastructure:** Redis for distributed rate limiting, job queues (push fan-out, scheduled announcements) and WebSocket fan-out; staff 2FA; CSV bulk import of students and guardians.
+- **Infrastructure:** Redis for distributed rate limiting, job queues (push fan-out, scheduled announcements) and WebSocket fan-out; staff 2FA.
 
 ## V3 — Advanced
 
@@ -49,7 +50,7 @@ The product specification is split into three releases. V1 is built in this repo
 ## Information the school needs to provide
 
 - ~~Official name, logo, motto, address~~ ✅ provided. Still needed: vision, mission, core values, history, phone/email and leadership
-- ~~Grading scale and assessment modes~~ ✅ WASSCE; 15/15/10/20/40. Still needed: whether class positions are published
+- ~~Grading scale and assessment modes~~ ✅ WASSCE; 15/15/10/20/40. Still needed: whether class positions are published, and which scale is official — the WASSCE table given (A1 75–100), the score sheet template (A1 80–100, B3 65–69) or the transcript (A1 80–100 with a 4.0 GPA). The scale is editable under School profile
 - ~~Houses~~ ✅ Gye Nyame, Asokore, Agyei Sarfo, Kuma Korante. Optional: house colours and house masters/mistresses
 - ~~Programme codes, options, subjects, classes per form~~ ✅ (same classes and options for SHS 1–3; Languages written "1 LANG 1A")
 - Teacher accounts for the staff on the timetables, so they can be assigned to class subjects (`db:sample-timetables` prints the list)

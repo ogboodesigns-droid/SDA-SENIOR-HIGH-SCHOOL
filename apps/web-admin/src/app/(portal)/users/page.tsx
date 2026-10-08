@@ -146,7 +146,11 @@ export default function UsersPage() {
 
   return (
     <>
-      <PageHeader title="People" description="Students, parents/guardians and staff accounts" />
+      <PageHeader
+        title="People"
+        description="Students, parents/guardians and staff accounts"
+        actions={canManage && <Link href="/users/import" className="button">Bulk import students</Link>}
+      />
       {canManage && <CreateUser onCreated={list.reload} />}
       <Card
         title="Accounts"

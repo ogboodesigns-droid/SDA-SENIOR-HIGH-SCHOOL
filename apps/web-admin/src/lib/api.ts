@@ -47,6 +47,45 @@ export async function api<T>(path: string, init: { method?: string; body?: unkno
   return data as T;
 }
 
+/** Uploads a file (multipart field "file") and returns the JSON reply. */
+export async function upload<T>(path: string, file: File): Promise<T> {
+  const send = () => {
+    const body = new FormData();
+    body.append('file', file);
+    return fetch(`/api/proxy${path}`, { method: 'POST', body, cache: 'no-store' });
+  };
+  let res = await send();
+  if (res.status === 401) {
+    await sleep(400);
+    res = await send();
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err = data as Partial<ApiErrorBody>;
+    throw new ApiError(res.status, err.message ?? 'Something went wrong', err.issues);
+  }
+  return data as T;
+}
+
+/** Downloads a file from the API and saves it under the name the API gives. */
+export async function download(path: string, fallbackName: string): Promise<void> {
+  const res = await fetch(`/api/proxy${path}`, { cache: 'no-store' });
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({}))) as Partial<ApiErrorBody>;
+    throw new ApiError(res.status, err.message ?? 'The file could not be downloaded');
+  }
+  const name = /filename="?([^";]+)"?/.exec(res.headers.get('content-disposition') ?? '')?.[1];
+  const fileName = name ? decodeURIComponent(name) : fallbackName;
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 /** Loads a resource and exposes a reload function; pass null to skip loading. */
 export function useApi<T>(path: string | null) {
   const [data, setData] = useState<T | undefined>();

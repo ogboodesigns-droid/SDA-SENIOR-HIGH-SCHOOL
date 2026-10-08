@@ -11,7 +11,44 @@ interface UserDetail extends Me {
   createdAt: string;
   lastLoginAt: string | null;
   guardians: { id: string; fullName: string; phone: string | null; email: string | null; relationship: string }[];
+  registration: Record<RegistrationKey, string | null> | null;
+  guardianProfile: { occupation: string | null; altPhone: string | null } | null;
 }
+
+/** Admission-form details, in the order of the school's student import sheet. */
+const REGISTRATION: [RegistrationKey, string][] = [
+  ['beceIndexNo', 'BECE index no.'],
+  ['gender', 'Gender'],
+  ['dateOfBirth', 'Date of birth'],
+  ['nationality', 'Nationality'],
+  ['ghanaCardNo', 'Ghana Card no.'],
+  ['hometown', 'Hometown'],
+  ['homeRegion', 'Home region'],
+  ['religion', 'Religion'],
+  ['jhsAttended', 'JHS attended'],
+  ['residentialStatus', 'Residential status'],
+  ['admissionDate', 'Admission date'],
+  ['residentialAddress', 'Residential address'],
+  ['gpsAddress', 'GPS address'],
+  ['emergencyContact', 'Emergency contact'],
+  ['medicalNotes', 'Medical notes / allergies'],
+];
+type RegistrationKey =
+  | 'beceIndexNo'
+  | 'gender'
+  | 'dateOfBirth'
+  | 'nationality'
+  | 'ghanaCardNo'
+  | 'hometown'
+  | 'homeRegion'
+  | 'religion'
+  | 'jhsAttended'
+  | 'residentialStatus'
+  | 'admissionDate'
+  | 'residentialAddress'
+  | 'gpsAddress'
+  | 'emergencyContact'
+  | 'medicalNotes';
 
 export default function UserDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -194,6 +231,21 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
         )}
       </Card>
 
+      {u.guardianProfile && (u.guardianProfile.occupation || u.guardianProfile.altPhone) && (
+        <Card title="Parent/guardian details">
+          <div className="grid">
+            <div>
+              <div className="field-label">Occupation</div>
+              {u.guardianProfile.occupation ?? '—'}
+            </div>
+            <div>
+              <div className="field-label">Other phone</div>
+              {u.guardianProfile.altPhone ?? '—'}
+            </div>
+          </div>
+        </Card>
+      )}
+
       {u.role === 'parent' && (
         <Card title="Children">
           {u.children.length ? (
@@ -207,6 +259,22 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
           ) : (
             <p className="empty">Not linked to any student yet. Link from the student&apos;s page.</p>
           )}
+        </Card>
+      )}
+
+      {u.registration && (
+        <Card title="Registration">
+          <div className="grid">
+            {REGISTRATION.map(([key, label]) => {
+              const v = u.registration![key];
+              return (
+                <div key={key}>
+                  <div className="field-label">{label}</div>
+                  {v ? (key === 'dateOfBirth' || key === 'admissionDate' ? formatDate(v) : key === 'gender' ? ({ M: 'Male', F: 'Female' }[v.toUpperCase()] ?? v) : v) : '—'}
+                </div>
+              );
+            })}
+          </div>
         </Card>
       )}
 

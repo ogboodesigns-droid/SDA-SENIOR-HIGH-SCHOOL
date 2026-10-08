@@ -107,3 +107,15 @@ td input { min-width: 70px; }
 .tt-combined { display: inline-block; margin-top: 3px; padding: 0 6px; border-radius: 999px; background: #e3f3e8; color: var(--ok); font-size: .75rem; font-weight: 600; }
 .tt-remove { background: none; border: none; color: var(--muted); padding: 0 3px; font-weight: 400; cursor: pointer; }
 .tt-remove:hover { color: var(--danger); }
+
+/* Sign-in slips from a bulk import: cut along the borders */
+.slips { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.slip { border: 1px dashed var(--border); border-radius: 8px; padding: 10px 12px; display: grid; gap: 3px; break-inside: avoid; }
+.slip code { font-size: .95rem; }
+@media print {
+  .sidebar, .page-header, .no-print, .alert { display: none !important; }
+  .shell { display: block; }
+  main { padding: 0; }
+  .card { border: none; box-shadow: none; padding: 0; }
+  .slips { grid-template-columns: 1fr 1fr; }
+}
