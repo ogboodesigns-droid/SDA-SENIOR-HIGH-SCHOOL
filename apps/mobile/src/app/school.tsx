@@ -1,4 +1,4 @@
-import { Linking, Text } from 'react-native';
+import { Image, Linking, Text } from 'react-native';
 import type { SchoolProfile } from '@sda-shs/shared';
 import { useQuery } from '@/lib/useQuery';
 import { Body, Card, ErrorNote, Loading, Screen, SectionTitle, Title, styles } from '@/components/ui';
@@ -32,7 +32,8 @@ export default function SchoolScreen() {
 
   return (
     <Screen refreshing={school.refreshing} onRefresh={school.refresh}>
-      <Card>
+      <Card style={{ alignItems: 'center' }}>
+        <Image source={require('../../assets/logo.png')} style={{ width: 140, height: 140 }} accessibilityLabel="School crest" />
         <Title>{s.name}</Title>
         {s.motto && <Body muted>“{s.motto}”</Body>}
       </Card>

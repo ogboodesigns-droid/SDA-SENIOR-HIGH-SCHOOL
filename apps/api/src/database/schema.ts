@@ -165,6 +165,8 @@ export const terms = pgTable(
 export const programmes = pgTable('programmes', {
   id: id(),
   name: text('name').notNull().unique(),
+  /** Short code used in class names: "SCI" in "1 SCI 2". Required by the API for new programmes. */
+  code: text('code').unique(),
 });
 
 export const classes = pgTable(
@@ -173,6 +175,8 @@ export const classes = pgTable(
     id: id(),
     name: text('name').notNull().unique(),
     form: smallint('form').notNull(),
+    /** Stream number within the form and programme: the "2" in "1 SCI 2". */
+    stream: smallint('stream'),
     programmeId: uuid('programme_id')
       .notNull()
       .references(() => programmes.id, { onDelete: 'restrict' }),
@@ -412,6 +416,8 @@ export const results = pgTable(
     examScore: score('exam_score').notNull(),
     total: score('total').notNull(),
     grade: text('grade').notNull(),
+    /** WAEC numeric value, 1 (A1) … 9 (F9). */
+    gradePoint: smallint('grade_point').notNull(),
     remark: text('remark').notNull(),
     teacherComment: text('teacher_comment'),
     enteredBy: uuid('entered_by')

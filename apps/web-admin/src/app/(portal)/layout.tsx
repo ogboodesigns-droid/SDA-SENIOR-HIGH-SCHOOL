@@ -50,8 +50,12 @@ export default function PortalLayout({ children }: { children: ReactNode }) {
     <MeContext.Provider value={me}>
       <div className="shell">
         <nav className="sidebar" aria-label="Main">
-          <div className="brand">SDA SHS</div>
-          <div className="brand-sub">Learn. Grow. Serve.</div>
+          <div className="brand">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.png" alt="" />
+            SDA SHS
+          </div>
+          <div className="brand-sub">Knowledge for Excellence</div>
           {links.map((l) => (
             <Link key={l.href} href={l.href} aria-current={pathname === l.href || (l.href !== '/' && pathname.startsWith(l.href)) ? 'page' : undefined}>
               {l.label}

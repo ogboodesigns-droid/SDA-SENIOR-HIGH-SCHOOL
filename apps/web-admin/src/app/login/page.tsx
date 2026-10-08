@@ -48,7 +48,9 @@ export default function LoginPage() {
   return (
     <div className="auth-page">
       <div className="auth-card stack">
-        <div>
+        <div style={{ textAlign: 'center' }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt="S.D.A Senior High School crest" className="auth-logo" />
           <h1>SDA SHS</h1>
           <p className="muted">Administration portal for staff. Students and parents use the mobile app.</p>
         </div>

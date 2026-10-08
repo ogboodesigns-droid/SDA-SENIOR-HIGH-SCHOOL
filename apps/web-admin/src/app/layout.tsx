@@ -3,7 +3,7 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: 'SDA SHS Admin',
-  description: 'SDA Senior High School — administration portal',
+  description: 'S.D.A Senior High School, Asokore-Koforidua — administration portal',
   robots: { index: false, follow: false },
 };
 

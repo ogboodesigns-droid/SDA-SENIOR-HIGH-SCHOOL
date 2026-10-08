@@ -4,6 +4,7 @@ import { api } from '@/lib/api';
 import { formatDate } from '@/lib/format';
 import { useQuery } from '@/lib/useQuery';
 import { Badge, Body, Button, Card, Empty, ErrorNote, Loading, Screen, Title } from '@/components/ui';
+import { colors } from '@/lib/theme';
 
 export default function NotificationsScreen() {
   const router = useRouter();
@@ -23,7 +24,7 @@ export default function NotificationsScreen() {
       {list.loading && <Loading />}
       {list.data && !list.data.items.length && <Empty>You have no notifications.</Empty>}
       {list.data?.items.map((n) => (
-        <Card key={n.id} onPress={() => open(n)} style={n.readAt ? undefined : { borderColor: '#123b7a', borderWidth: 2 }}>
+        <Card key={n.id} onPress={() => open(n)} style={n.readAt ? undefined : { borderColor: colors.brand, borderWidth: 2 }}>
           {!n.readAt && <Badge label="NEW" />}
           <Title>{n.title}</Title>
           <Body>{n.body}</Body>

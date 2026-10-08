@@ -3,7 +3,7 @@
 #
 #   cp .env.example .env   # fill in POSTGRES_PASSWORD and JWT_ACCESS_SECRET
 #   docker compose up -d --build
-#   docker compose exec api sh -c 'SCHOOL_NAME="..." ADMIN_NAME="..." ADMIN_EMAIL="..." ADMIN_PASSWORD="..." node dist/database/bootstrap.js'
+#   docker compose exec api sh -c 'ADMIN_NAME="..." ADMIN_EMAIL="..." ADMIN_PASSWORD="..." node dist/database/bootstrap.js'
 services:
   db:
     image: postgres:16-alpine

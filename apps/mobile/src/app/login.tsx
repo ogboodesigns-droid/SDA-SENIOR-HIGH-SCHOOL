@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { SchoolProfile } from '@sda-shs/shared';
 import { describeError } from '@/lib/api';
@@ -37,9 +37,10 @@ export default function LoginScreen() {
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={s.wrap} keyboardShouldPersistTaps="handled">
           <View style={s.header}>
+            <Image source={require('../../assets/logo.png')} style={s.logo} accessibilityLabel="S.D.A Senior High School crest" />
             <Text style={s.brand}>SDA SHS</Text>
-            <Text style={s.sub}>{school.data?.name ?? 'SDA Senior High School'}</Text>
-            <Text style={s.motto}>{school.data?.motto ?? 'Learn. Grow. Serve.'}</Text>
+            <Text style={s.sub}>{school.data?.name ?? 'S.D.A Senior High School, Asokore-Koforidua'}</Text>
+            <Text style={s.motto}>{school.data?.motto ?? 'Knowledge for Excellence'}</Text>
           </View>
           <View style={s.card}>
             <Input
@@ -75,8 +76,9 @@ export default function LoginScreen() {
 const s = StyleSheet.create({
   wrap: { flexGrow: 1, justifyContent: 'center', padding: space.xl, gap: space.xl },
   header: { alignItems: 'center', gap: space.xs },
+  logo: { width: 120, height: 120, borderRadius: 60, backgroundColor: '#fff', marginBottom: space.sm },
   brand: { color: '#fff', fontSize: 34, fontWeight: '800', letterSpacing: 1 },
-  sub: { color: '#dfe7f5', fontSize: 16, textAlign: 'center' },
+  sub: { color: '#f6dbe9', fontSize: 16, textAlign: 'center' },
   motto: { color: colors.gold, fontSize: 14, fontStyle: 'italic' },
   card: { backgroundColor: '#fff', borderRadius: 16, padding: space.xl, gap: space.lg },
   help: { color: colors.muted, fontSize: 13, textAlign: 'center' },

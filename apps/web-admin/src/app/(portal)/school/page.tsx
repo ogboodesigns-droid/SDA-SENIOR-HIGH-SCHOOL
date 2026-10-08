@@ -89,14 +89,12 @@ function GradingScale() {
   });
   if (!draft) return <Loading />;
 
-  const setBand = (i: number, key: 'min' | 'grade' | 'remark', value: string) =>
-    setDraft({ ...draft, bands: draft.bands.map((b, j) => (j === i ? { ...b, [key]: key === 'min' ? Number(value) : value } : b)) });
+  const setBand = (i: number, key: 'min' | 'grade' | 'points' | 'remark', value: string) =>
+    setDraft({ ...draft, bands: draft.bands.map((b, j) => (j === i ? { ...b, [key]: key === 'min' || key === 'points' ? Number(value) : value } : b)) });
 
   return (
     <form className="stack" onSubmit={save.onSubmit}>
-      <Alert kind="info">
-        This starts from the WAEC-style nine-point scale. Confirm it matches the school&apos;s official policy before results are published.
-      </Alert>
+      <Alert kind="info">The WASSCE grading scale (A1 = 1 … F9 = 9). Grade points are used for the aggregate of the best three core and three elective subjects.</Alert>
       <div className="row">
         <Field label="CA out of">
           <input type="number" value={draft.caMax} onChange={(e) => setDraft({ ...draft, caMax: Number(e.target.value) })} style={{ maxWidth: 100 }} />
@@ -110,6 +108,7 @@ function GradingScale() {
           <tr>
             <th>From (total ≥)</th>
             <th>Grade</th>
+            <th>Points</th>
             <th>Remark</th>
             <th />
           </tr>
@@ -124,6 +123,9 @@ function GradingScale() {
                 <input value={b.grade} onChange={(e) => setBand(i, 'grade', e.target.value)} aria-label="Grade" />
               </td>
               <td>
+                <input type="number" min={1} max={9} value={b.points} onChange={(e) => setBand(i, 'points', e.target.value)} aria-label="Grade points" />
+              </td>
+              <td>
                 <input value={b.remark} onChange={(e) => setBand(i, 'remark', e.target.value)} aria-label="Remark" />
               </td>
               <td>
@@ -136,7 +138,7 @@ function GradingScale() {
         </tbody>
       </table>
       <div className="row">
-        <button type="button" className="secondary" onClick={() => setDraft({ ...draft, bands: [...draft.bands, { min: 0, grade: '', remark: '' }] })}>
+        <button type="button" className="secondary" onClick={() => setDraft({ ...draft, bands: [...draft.bands, { min: 0, grade: '', points: 9, remark: '' }] })}>
           Add band
         </button>
         <button disabled={save.busy}>Save grading scale</button>

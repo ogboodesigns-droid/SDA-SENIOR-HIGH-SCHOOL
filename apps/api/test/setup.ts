@@ -67,7 +67,7 @@ export async function seedSchool(db: Db) {
     .insert(schema.terms)
     .values({ academicYearId: year.id, name: 'First Semester', startsOn: '2026-09-01', endsOn: '2026-12-18', isCurrent: true })
     .returning();
-  const [science] = await db.insert(schema.programmes).values({ name: 'General Science' }).returning();
+  const [science] = await db.insert(schema.programmes).values({ name: 'General Science', code: 'SCI' }).returning();
 
   const head = await insertUser(db, 'Head Teacher', 'head', 'head@test.local');
   const teacherA = await insertUser(db, 'Teacher A', 'teacher', 'teacher.a@test.local');

@@ -33,7 +33,8 @@
 - **One primary role per account.** Responsibilities such as "form master of 2 Science A" or "teaches Core Maths in 1 Arts B" come from data (`classes.form_master_id`, `class_subjects.teacher_id`), not extra roles, so reassigning a teacher needs no permission changes.
 - **Audience targeting** (`school` / `role` / `form` / `programme` / `class`) is shared by announcements and events, and is evaluated in SQL so feeds stay fast.
 - **Results are frozen once published.** Teachers can no longer change them; leadership can correct them, and the correction is audited separately.
-- **Grading scale is data**, stored with the school profile and editable in the portal. The default is the WAEC-style nine-point scale, which the school must confirm.
+- **Grading follows the WASSCE scale** (A1 75–100 = 1 … F9 0–39 = 9). It is stored with the school profile and editable in the portal; each result stores its grade point so term aggregates (best 3 core + best 3 electives) can be computed.
+- **Class names** follow the school's convention `<form> <programme code> <stream>` (e.g. `1 SCI 2`). Programmes carry the code; `classes.stream` keeps streams in numeric order. `POST /classes/bulk` creates a programme's full set and skips existing classes.
 - **Low bandwidth.** The app keeps previous data on screen while refetching, uses 20-second timeouts with friendly messages, and pages are plain lists without heavy images or animation.
 - **Scheduled announcements** are dispatched by a once-a-minute job in the API. Each row is claimed with an `UPDATE … RETURNING`, so several API instances never notify twice.
 

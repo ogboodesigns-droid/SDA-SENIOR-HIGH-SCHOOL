@@ -53,7 +53,7 @@ These rules are covered by integration tests in `apps/api/test/access.spec.ts` a
 - [ ] Enable encrypted, automated **database backups** (and storage-bucket backups) and test a restore.
 - [ ] Enable encryption at rest on the database volume and object storage.
 - [ ] Set `CORS_ORIGINS` to the real portal origin only.
-- [ ] Confirm the grading scale and school profile with the school before going live.
+- [ ] Complete the school profile (vision, mission, history, contacts) before going live.
 - [ ] Agree a **data-retention policy** with the school (e.g. how long leavers' records are kept) before V2's archival tooling.
 - [ ] Confirm what consent the school collects from parents/guardians, and comply with Ghana's Data Protection Act, 2012 (Act 843), including registration with the Data Protection Commission where required.
 

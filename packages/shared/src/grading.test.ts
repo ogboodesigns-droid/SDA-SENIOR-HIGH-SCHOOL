@@ -5,8 +5,11 @@ import { hasPermission } from './permissions';
 
 test('gradeFor picks the band whose lower bound the total reaches', () => {
   assert.equal(gradeFor(100, DEFAULT_GRADING_SCALE).grade, 'A1');
-  assert.equal(gradeFor(80, DEFAULT_GRADING_SCALE).grade, 'A1');
-  assert.equal(gradeFor(79.5, DEFAULT_GRADING_SCALE).grade, 'B2');
+  assert.equal(gradeFor(75, DEFAULT_GRADING_SCALE).grade, 'A1');
+  assert.equal(gradeFor(74.5, DEFAULT_GRADING_SCALE).grade, 'B2');
+  assert.equal(gradeFor(70, DEFAULT_GRADING_SCALE).grade, 'B2');
+  assert.equal(gradeFor(45, DEFAULT_GRADING_SCALE).grade, 'D7');
+  assert.equal(gradeFor(44, DEFAULT_GRADING_SCALE).points, 8);
   assert.equal(gradeFor(39, DEFAULT_GRADING_SCALE).grade, 'F9');
   assert.equal(gradeFor(0, DEFAULT_GRADING_SCALE).grade, 'F9');
 });

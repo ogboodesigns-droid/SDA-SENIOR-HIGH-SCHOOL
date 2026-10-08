@@ -15,7 +15,7 @@ The product specification is split into three releases. V1 is built in this repo
 | Timetable (§7) | ✅ | Per class/term, clash detection, personal view |
 | Student academic portal (§8) | ✅ | Subjects with teachers |
 | Assignments (§9) | ✅ | Text and file submissions, late flag, marking with feedback |
-| Results (§10) | ✅ | CA/exam/total/grade/remark/comment, publish workflow, term average. *Class position* is not computed until the school confirms its policy |
+| Results (§10) | ✅ | CA/exam/total/WASSCE grade and grade point/remark/comment, publish workflow, term average and aggregate. *Class position* is not computed until the school confirms its policy |
 | School calendar (§16) | ✅ | Audience-targeted events |
 | Push notifications (§28) | ✅ | Expo push; targeted by school, role, form, programme, class, student and guardians |
 | Admin dashboard (§29) | ✅ (V1 scope) | People, classes & subjects, timetable, announcements, calendar, assignments, results, school profile, audit log |
@@ -47,8 +47,9 @@ The product specification is split into three releases. V1 is built in this repo
 
 ## Information the school needs to provide
 
-- Official school name, logo, motto, vision, mission, core values, history, contacts and leadership
-- Confirmed grading scale and CA/exam weighting, and whether class positions are published
-- Programmes, classes, subjects and teacher assignments; academic calendar
+- ~~Official name, logo, motto, address~~ ✅ provided. Still needed: vision, mission, core values, history, phone/email and leadership
+- ~~Grading scale~~ ✅ WASSCE. Still needed: confirm the CA/exam split (30/70 assumed) and whether class positions are published
+- Number of classes per form for Science, Business and Languages, and the codes for Home Economics, Visual Arts, Languages and General Arts (HE, VA, LANG, GA assumed)
+- Subjects and teacher assignments; academic calendar
 - Houses, clubs and religious programme structure (V2)
 - Fees structure and official payment provider details (V2, before any payment integration)

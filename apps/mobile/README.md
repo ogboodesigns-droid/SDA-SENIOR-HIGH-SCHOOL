@@ -32,7 +32,7 @@ eas build --platform android --profile production   # AAB for the Play Store
 eas build --platform android --profile preview      # APK for direct installation
 ```
 
-Before release: add the official school logo as the app icon and adaptive icon in `app.json`, and set `EXPO_PUBLIC_API_URL` to the HTTPS production API.
+The school crest is used for the app icon, adaptive icon and splash screen (`assets/`). The supplied logo is 400×400 px; the 1024 px icon is upscaled from it, so swap in a higher-resolution original when available. Set `EXPO_PUBLIC_API_URL` to the HTTPS production API before release.
 
 ## Structure
 

@@ -17,7 +17,7 @@ const QUICK: { label: string; icon: keyof typeof Ionicons.glyphMap; href: Href; 
   { label: 'News', icon: 'megaphone-outline', href: '/updates' },
   { label: 'Events', icon: 'calendar-outline', href: '/calendar' },
   { label: 'Faith Life', icon: 'heart-outline', href: '/faith' },
-  { label: 'Our School', icon: 'business-outline', href: '/school' },
+  { label: 'Our School', icon: 'school-outline', href: '/school' },
 ];
 
 function isoDay(offsetDays: number) {
@@ -145,7 +145,7 @@ export default function HomeScreen() {
 const s = StyleSheet.create({
   hero: { backgroundColor: colors.brand, borderRadius: 16, padding: space.lg, gap: space.xs },
   greeting: { color: '#fff', fontSize: 22, fontWeight: '800' },
-  heroSub: { color: '#dfe7f5', fontSize: 14 },
+  heroSub: { color: '#f6dbe9', fontSize: 14 },
   bell: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: space.sm, alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
   bellText: { color: '#fff', fontWeight: '600' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },

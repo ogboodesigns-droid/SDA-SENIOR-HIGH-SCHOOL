@@ -179,6 +179,8 @@ export interface ResultRow {
   examScore: number;
   total: number;
   grade: string;
+  /** WAEC numeric value (1 = A1 … 9 = F9). */
+  gradePoint: number;
   remark: string;
   teacherComment: string | null;
   published: boolean;

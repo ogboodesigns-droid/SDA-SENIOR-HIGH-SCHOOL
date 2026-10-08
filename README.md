@@ -1,8 +1,8 @@
-# SDA SHS — SDA Senior High School app
+# SDA SHS — S.D.A Senior High School, Asokore-Koforidua
 
-**Learn. Grow. Serve.**
+**Knowledge for Excellence** · P. O. Box 18, Asokore - Koforidua · Est. 2001
 
-One connected system for SDA Senior High School:
+One connected system for the school:
 
 | App | What it is | Who uses it |
 | --- | --- | --- |
@@ -18,12 +18,12 @@ Students and parents use the phone app; teachers and administrators do the heavi
 - **Secure accounts** for students, parents/guardians, teachers and staff, created by the school (no public sign-up). Sign in with a student number, staff number, email or phone. Temporary passwords must be changed at first sign-in.
 - **Role-based access** (super admin, head, assistant head, teacher, accountant, librarian, counsellor, parent, student) plus record-level rules: students see only their own records, parents only their linked children, teachers only the classes they teach.
 - **School profile**: name, motto, vision, mission, core values, history and contacts, all editable in the portal.
-- **Academic structure**: academic years, terms, programmes, classes (SHS 1–3), subjects, and which teacher takes each subject in each class.
+- **Academic structure**: academic years, terms, programmes, classes, subjects, and which teacher takes each subject in each class. Classes follow the school's naming — form, programme code, class number (1 SCI 1, 2 BUS 2, 3 GA 6) — and a whole programme's classes can be created in one step (e.g. General Arts with 6 classes per form), with single classes addable at any time.
 - **Timetable** per class and term, with class and teacher clash detection; personal weekly view in the app.
 - **Announcements** by category (Academic, Examination, Sports, SRC, PTA, Religious, Emergency…), targeted at the whole school, a role, a form, a programme or a class, with scheduling, expiry, priority and optional push notifications.
 - **School calendar** of events, also audience-targeted.
 - **Assignments**: teachers set work; students submit text and/or a PDF, Word document or photo; teachers mark with feedback; late submissions are flagged.
-- **Results**: CA + exam entry per class and subject, grades computed from the school's configurable grading scale, kept private until leadership publishes them, then visible to the student and their parents.
+- **Results**: CA + exam entry per class and subject, grades computed on the **WASSCE scale** (A1 75–100 … F9 0–39, grade points 1–9) with a term average and aggregate (best 3 core + best 3 electives), kept private until leadership publishes them, then visible to the student and their parents.
 - **Notifications**: in-app inbox plus Expo push notifications for new assignments, marked work, published results and announcements.
 - **Faith & Spiritual Life** section built from the school's religious announcements and programmes.
 - **Read aloud** for announcements (text-to-speech).
@@ -47,8 +47,8 @@ pnpm --filter @sda-shs/api build
 pnpm db:migrate
 
 # First-time setup: the school's official name and the first super administrator
-SCHOOL_NAME="SDA Senior High School" ADMIN_NAME="Your Name" \
-ADMIN_EMAIL="you@example.com" ADMIN_PASSWORD="a-strong-password-1" pnpm db:bootstrap
+# (the school's name, motto and address are filled in automatically)
+ADMIN_NAME="Your Name" ADMIN_EMAIL="you@example.com" ADMIN_PASSWORD="a-strong-password-1" pnpm db:bootstrap
 
 pnpm dev:api        # http://localhost:4000
 pnpm dev:admin      # http://localhost:3000
@@ -62,7 +62,7 @@ Then sign in to the portal at http://localhost:3000 and follow the "Getting star
 ```bash
 cp .env.example .env    # set POSTGRES_PASSWORD and JWT_ACCESS_SECRET
 docker compose up -d --build
-docker compose exec api sh -c 'SCHOOL_NAME="..." ADMIN_NAME="..." ADMIN_EMAIL="..." ADMIN_PASSWORD="..." node dist/database/bootstrap.js'
+docker compose exec api sh -c 'ADMIN_NAME="..." ADMIN_EMAIL="..." ADMIN_PASSWORD="..." node dist/database/bootstrap.js'
 ```
 
 ### Mobile app

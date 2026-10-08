@@ -1,9 +1,12 @@
-import { Body, Controller, Delete, Get, HttpCode, NotFoundException, Param, ParseUUIDPipe, Patch, Post, Put, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, HttpCode, NotFoundException, Param, ParseUUIDPipe, Patch, Post, Put, Query } from '@nestjs/common';
 import { and, asc, desc, eq, inArray, ne } from 'drizzle-orm';
 import { z } from 'zod';
 import {
   isLeadership,
   academicYearSchema,
+  bulkClassesSchema,
+  className,
+  type BulkClassesInput,
   classSchema,
   classSubjectSchema,
   programmeSchema,
@@ -21,6 +24,12 @@ import { AccessService } from '../access/access.service';
 import { MeService } from '../auth/me.service';
 
 type Infer<T extends z.ZodType> = z.infer<T>;
+
+/** "2 SCI 3" → 3; null when the name doesn't end in a number. */
+function streamFromName(name: string): number | null {
+  const m = /\s(\d{1,2})$/.exec(name.trim());
+  return m ? Number(m[1]) : null;
+}
 
 @Controller()
 export class AcademicsController {
@@ -95,6 +104,14 @@ export class AcademicsController {
     return row;
   }
 
+  @RequirePermissions('academics:manage')
+  @Patch('programmes/:id')
+  async updateProgramme(@Param('id', ParseUUIDPipe) id: string, @Body(new ZodPipe(programmeSchema.partial())) body: Partial<Infer<typeof programmeSchema>>) {
+    const [row] = await this.db.update(programmes).set(body).where(eq(programmes.id, id)).returning();
+    if (!row) throw new NotFoundException('Programme not found');
+    return row;
+  }
+
   // ── Classes ───────────────────────────────────────────────────────────────
 
   /** Classes the user may see: the whole school for leadership, otherwise their own. */
@@ -107,8 +124,10 @@ export class AcademicsController {
         id: classes.id,
         name: classes.name,
         form: classes.form,
+        stream: classes.stream,
         programmeId: classes.programmeId,
         programmeName: programmes.name,
+        programmeCode: programmes.code,
         formMasterId: classes.formMasterId,
         formMasterName: users.fullName,
       })
@@ -116,22 +135,53 @@ export class AcademicsController {
       .innerJoin(programmes, eq(programmes.id, classes.programmeId))
       .leftJoin(users, eq(users.id, classes.formMasterId))
       .where(readable === 'all' ? undefined : inArray(classes.id, readable))
-      .orderBy(asc(classes.form), asc(classes.name));
+      .orderBy(asc(classes.form), asc(programmes.name), asc(classes.stream), asc(classes.name));
   }
 
   @RequirePermissions('academics:manage')
   @Post('classes')
   async createClass(@Body(new ZodPipe(classSchema)) body: Infer<typeof classSchema>) {
     await this.assertTeacher(body.formMasterId);
-    const [row] = await this.db.insert(classes).values(body).returning();
+    const [row] = await this.db
+      .insert(classes)
+      .values({ ...body, stream: body.stream ?? streamFromName(body.name) })
+      .returning();
     return row;
+  }
+
+  /**
+   * Creates "<form> <CODE> <stream>" classes for a programme — e.g. 1 GA 1 … 3 GA 6
+   * for six General Arts streams — skipping any that already exist.
+   */
+  @RequirePermissions('academics:manage')
+  @Post('classes/bulk')
+  async createClassSet(@Body(new ZodPipe(bulkClassesSchema)) body: BulkClassesInput) {
+    const [programme] = await this.db.select().from(programmes).where(eq(programmes.id, body.programmeId));
+    if (!programme) throw new NotFoundException('Programme not found');
+    if (!programme.code) throw new BadRequestException('Give this programme a short code (e.g. SCI) first');
+    const values = body.forms.flatMap((form) =>
+      Array.from({ length: body.streams }, (_, i) => ({
+        name: className(form, programme.code!, i + 1),
+        form,
+        stream: i + 1,
+        programmeId: programme.id,
+      })),
+    );
+    const created = await this.db
+      .insert(classes)
+      .values(values)
+      .onConflictDoNothing({ target: classes.name })
+      .returning({ name: classes.name });
+    return { created: created.map((c) => c.name), skipped: values.length - created.length };
   }
 
   @RequirePermissions('academics:manage')
   @Patch('classes/:id')
   async updateClass(@Param('id', ParseUUIDPipe) id: string, @Body(new ZodPipe(classSchema.partial())) body: Partial<Infer<typeof classSchema>>) {
     await this.assertTeacher(body.formMasterId);
-    const [row] = await this.db.update(classes).set(body).where(eq(classes.id, id)).returning();
+    const [row] = await this.db
+      .update(classes)
+      .set({ ...body, stream: body.stream ?? (body.name ? streamFromName(body.name) : undefined) }).where(eq(classes.id, id)).returning();
     if (!row) throw new NotFoundException('Class not found');
     return row;
   }

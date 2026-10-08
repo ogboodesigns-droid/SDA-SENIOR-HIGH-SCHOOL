@@ -77,7 +77,7 @@ export function Body({ children, muted, style, lines }: { children: ReactNode; m
 
 export function Badge({ label, tone = 'brand' }: { label: string; tone?: 'brand' | 'ok' | 'warn' | 'danger' | 'muted' }) {
   const palette = {
-    brand: ['#e8edf6', colors.brand],
+    brand: ['#f8e6f0', colors.brand],
     ok: ['#e3f3e8', colors.ok],
     warn: ['#fdf1d8', colors.warn],
     danger: ['#fbe4e2', colors.danger],

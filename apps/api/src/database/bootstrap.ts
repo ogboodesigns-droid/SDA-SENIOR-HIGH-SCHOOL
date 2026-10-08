@@ -1,13 +1,14 @@
 /**
  * One-time setup for a fresh installation:
- *   - creates the school profile row with the official school name
+ *   - creates the school profile with the school's official details
  *   - creates the first Super Administrator account
  *
  * It deliberately creates no students, staff, classes or other sample data:
  * the school enters its real records through the admin portal.
  *
  * Usage:
- *   SCHOOL_NAME="..." ADMIN_NAME="..." ADMIN_EMAIL="..." ADMIN_PASSWORD="..." pnpm db:bootstrap
+ *   ADMIN_NAME="..." ADMIN_EMAIL="..." ADMIN_PASSWORD="..." pnpm db:bootstrap
+ * (SCHOOL_NAME, SCHOOL_MOTTO and SCHOOL_ADDRESS override the defaults below.)
  */
 import { hash } from 'argon2';
 import { drizzle } from 'drizzle-orm/node-postgres';
@@ -15,6 +16,14 @@ import { eq } from 'drizzle-orm';
 import { Pool } from 'pg';
 import { DEFAULT_GRADING_SCALE, DEFAULT_SCORE_LIMITS, passwordSchema } from '@sda-shs/shared';
 import * as schema from './schema';
+
+/** As shown on the school crest and supplied by the school. */
+const SCHOOL = {
+  name: 'S.D.A Senior High School, Asokore-Koforidua',
+  shortName: 'SDA SHS',
+  motto: 'Knowledge for Excellence',
+  address: 'P. O. Box 18, Asokore - Koforidua',
+};
 
 function required(name: string): string {
   const v = process.env[name]?.trim();
@@ -26,12 +35,14 @@ async function main() {
   const pool = new Pool({ connectionString: required('DATABASE_URL'), max: 1 });
   const db = drizzle(pool, { schema });
   try {
-    const schoolName = required('SCHOOL_NAME');
     await db
       .insert(schema.schoolProfile)
       .values({
         id: 1,
-        name: schoolName,
+        name: process.env.SCHOOL_NAME?.trim() || SCHOOL.name,
+        shortName: SCHOOL.shortName,
+        motto: process.env.SCHOOL_MOTTO?.trim() || SCHOOL.motto,
+        address: process.env.SCHOOL_ADDRESS?.trim() || SCHOOL.address,
         gradingScale: { ...DEFAULT_SCORE_LIMITS, bands: DEFAULT_GRADING_SCALE },
       })
       .onConflictDoNothing();

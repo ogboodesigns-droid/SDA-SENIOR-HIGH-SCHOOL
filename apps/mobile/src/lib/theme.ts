@@ -1,7 +1,8 @@
 export const colors = {
-  brand: '#123b7a',
-  brandDark: '#0c2a59',
-  accent: '#c8102e',
+  // From the school crest
+  brand: '#a00561',
+  brandDark: '#6e0a44',
+  accent: '#a00561',
   gold: '#d9a520',
   bg: '#f4f6fa',
   surface: '#ffffff',

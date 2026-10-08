@@ -8,6 +8,13 @@
       "when": 1791436509244,
       "tag": "0000_init",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791445429506,
+      "tag": "0001_waec_scale_programme_codes",
+      "breakpoints": true
     }
   ]
 }

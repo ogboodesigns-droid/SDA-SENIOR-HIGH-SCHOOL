@@ -134,7 +134,7 @@ export const gradingScaleSchema = z
     caMax: z.number().positive().max(100),
     examMax: z.number().positive().max(100),
     bands: z
-      .array(z.object({ min: z.number().min(0).max(100), grade: trimmed(4), remark: trimmed(40) }))
+      .array(z.object({ min: z.number().min(0).max(100), grade: trimmed(4), points: z.number().int().min(1).max(9), remark: trimmed(40) }))
       .min(2)
       .max(15),
   })
@@ -158,12 +158,36 @@ export const termSchema = z
   })
   .refine((v) => v.startsOn < v.endsOn, 'The term must end after it starts');
 
-export const programmeSchema = z.object({ name: trimmed(80) });
+/** Short code used in class names, e.g. "SCI" in "1 SCI 2". */
+const programmeCode = z
+  .string()
+  .trim()
+  .toUpperCase()
+  .regex(/^[A-Z]{1,6}$/, 'Use 1–6 letters, e.g. SCI');
+
+export const programmeSchema = z.object({ name: trimmed(80), code: programmeCode });
+
+/**
+ * Creates the standard set of classes for a programme, named "<form> <CODE> <stream>",
+ * e.g. 1 SCI 1, 1 SCI 2 … 3 SCI 2. Classes that already exist are left alone.
+ */
+export const bulkClassesSchema = z.object({
+  programmeId: uuid,
+  forms: z.array(z.number().int().min(1).max(3)).min(1).max(3).default([1, 2, 3]),
+  streams: z.number().int().min(1).max(20),
+});
+export type BulkClassesInput = z.infer<typeof bulkClassesSchema>;
+
+export function className(form: number, programmeCode: string, stream: number) {
+  return `${form} ${programmeCode} ${stream}`;
+}
 
 export const classSchema = z.object({
   name: trimmed(60),
   form: z.number().int().min(1).max(3),
   programmeId: uuid,
+  /** Stream number within the form and programme (the "2" in "1 SCI 2"); used for ordering. */
+  stream: z.number().int().min(1).max(50).nullish(),
   formMasterId: uuid.nullish(),
 });
 

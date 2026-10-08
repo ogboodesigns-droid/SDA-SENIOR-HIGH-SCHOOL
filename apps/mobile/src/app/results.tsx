@@ -8,7 +8,7 @@ import { Body, Card, Empty, ErrorNote, Loading, Screen, SectionTitle, Title, sty
 
 interface ResultsResponse {
   rows: ResultRow[];
-  terms: { termId: string; termName: string; subjects: number; average: number }[];
+  terms: { termId: string; termName: string; subjects: number; average: number; aggregate: number | null }[];
 }
 
 function Cell({ children, flex = 1, bold }: { children: React.ReactNode; flex?: number; bold?: boolean }) {
@@ -32,7 +32,8 @@ export default function ResultsScreen() {
         <View key={t.termId} style={{ gap: 8 }}>
           <SectionTitle>{t.termName}</SectionTitle>
           <Card>
-            <Title>Average: {t.average}</Title>
+            <Title>Average: {t.average}%</Title>
+            {t.aggregate !== null && <Body>Aggregate (best 3 core + best 3 electives): {t.aggregate}</Body>}
             <Body muted>
               {t.subjects} subject{t.subjects === 1 ? '' : 's'}
             </Body>
@@ -67,6 +68,9 @@ export default function ResultsScreen() {
                     <Cell flex={1.3} bold>
                       {r.grade}
                     </Cell>
+                  </View>
+                  <View style={styles.row}>
+                    <Body muted>{r.remark}</Body>
                   </View>
                   {r.teacherComment && <Body muted>“{r.teacherComment}”</Body>}
                 </View>

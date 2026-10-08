@@ -32,12 +32,13 @@ export class ResultsService {
     return row?.g ?? { ...DEFAULT_SCORE_LIMITS, bands: DEFAULT_GRADING_SCALE };
   }
 
-  private async rows(where: SQL | undefined): Promise<ResultRow[]> {
+  private async rows(where: SQL | undefined): Promise<(ResultRow & { isCore: boolean })[]> {
     const rows = await this.db
       .select({
         r: results,
         studentName: users.fullName,
         subjectName: subjects.name,
+        isCore: subjects.isCore,
         termName: terms.name,
       })
       .from(results)
@@ -47,7 +48,7 @@ export class ResultsService {
       .innerJoin(terms, eq(terms.id, results.termId))
       .where(where)
       .orderBy(desc(terms.startsOn), desc(subjects.isCore), asc(subjects.name), asc(users.fullName));
-    return rows.map(({ r, studentName, subjectName, termName }) => ({
+    return rows.map(({ r, studentName, subjectName, isCore, termName }) => ({
       id: r.id,
       studentId: r.studentId,
       studentName,
@@ -59,6 +60,8 @@ export class ResultsService {
       examScore: r.examScore,
       total: r.total,
       grade: r.grade,
+      gradePoint: r.gradePoint,
+      isCore,
       remark: r.remark,
       teacherComment: r.teacherComment,
       published: !!r.publishedAt,
@@ -108,6 +111,7 @@ export class ResultsService {
           examScore: e.examScore,
           total,
           grade: band.grade,
+          gradePoint: band.points,
           remark: band.remark,
           teacherComment: e.teacherComment ?? null,
           enteredBy: user.id,
@@ -185,14 +189,32 @@ export class ResultsService {
     return this.withSummary(await this.rows(and(eq(results.studentId, studentId), termId ? eq(results.termId, termId) : undefined)));
   }
 
-  private withSummary(rows: ResultRow[]) {
-    const byTerm = new Map<string, { termId: string; termName: string; subjects: number; average: number }>();
+  /**
+   * Per-term average, plus the WASSCE-style aggregate: the sum of grade points
+   * of the best three core and best three elective subjects (6 is the best
+   * possible). Null until a term has at least three of each.
+   */
+  private withSummary(rows: (ResultRow & { isCore: boolean })[]) {
+    const byTerm = new Map<string, { termId: string; termName: string; rows: typeof rows }>();
     for (const r of rows) {
-      const t = byTerm.get(r.termId) ?? { termId: r.termId, termName: r.termName, subjects: 0, average: 0 };
-      t.average = (t.average * t.subjects + r.total) / (t.subjects + 1);
-      t.subjects += 1;
+      const t = byTerm.get(r.termId) ?? { termId: r.termId, termName: r.termName, rows: [] };
+      t.rows.push(r);
       byTerm.set(r.termId, t);
     }
-    return { rows, terms: [...byTerm.values()].map((t) => ({ ...t, average: round2(t.average) })) };
+    const best3 = (points: number[]) => (points.length < 3 ? null : [...points].sort((a, b) => a - b).slice(0, 3).reduce((a, b) => a + b, 0));
+    return {
+      rows: rows.map(({ isCore: _isCore, ...r }) => r),
+      terms: [...byTerm.values()].map((t) => {
+        const core = best3(t.rows.filter((r) => r.isCore).map((r) => r.gradePoint));
+        const elective = best3(t.rows.filter((r) => !r.isCore).map((r) => r.gradePoint));
+        return {
+          termId: t.termId,
+          termName: t.termName,
+          subjects: t.rows.length,
+          average: round2(t.rows.reduce((sum, r) => sum + r.total, 0) / t.rows.length),
+          aggregate: core !== null && elective !== null ? core + elective : null,
+        };
+      }),
+    };
   }
 }
