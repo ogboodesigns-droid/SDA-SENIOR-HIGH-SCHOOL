@@ -9,6 +9,10 @@ import {
   type BulkClassesInput,
   classSchema,
   classSubjectSchema,
+  combinationSchema,
+  coreExclusionsSchema,
+  type CombinationInput,
+  type SubjectCombination,
   programmeSchema,
   subjectSchema,
   termSchema,
@@ -16,16 +20,29 @@ import {
   type TermSummary,
 } from '@sda-shs/shared';
 import { InjectDb, type Database } from '../database/database.module';
-import { academicYears, classes, classSubjects, programmes, students, subjects, terms, users } from '../database/schema';
+import {
+  academicYears,
+  classes,
+  classSubjects,
+  combinationSubjects,
+  programmeCoreExclusions,
+  programmes,
+  students,
+  subjectCombinations,
+  subjects,
+  terms,
+  users,
+} from '../database/schema';
 import type { AuthUser } from '../common/auth-user';
 import { CurrentUser, RequirePermissions } from '../common/decorators';
 import { ZodPipe } from '../common/zod.pipe';
 import { AccessService } from '../access/access.service';
 import { MeService } from '../auth/me.service';
+import { CurriculumService } from './curriculum.service';
 
 type Infer<T extends z.ZodType> = z.infer<T>;
 
-/** "2 SCI 3" → 3; null when the name doesn't end in a number. */
+/** "2BUS 3" → 3; null when the name doesn't end in a number. */
 function streamFromName(name: string): number | null {
   const m = /\s(\d{1,2})$/.exec(name.trim());
   return m ? Number(m[1]) : null;
@@ -37,24 +54,27 @@ export class AcademicsController {
     @InjectDb() private readonly db: Database,
     private readonly access: AccessService,
     private readonly me: MeService,
+    private readonly curriculum: CurriculumService,
   ) {}
 
   // ── Years & terms ─────────────────────────────────────────────────────────
 
   @Get('terms')
   async listTerms(): Promise<TermSummary[]> {
-    return this.db
+    const rows = await this.db
       .select({
         id: terms.id,
         name: terms.name,
         academicYearName: academicYears.name,
         startsOn: terms.startsOn,
         endsOn: terms.endsOn,
+        semester: terms.semester,
         isCurrent: terms.isCurrent,
       })
       .from(terms)
       .innerJoin(academicYears, eq(academicYears.id, terms.academicYearId))
       .orderBy(desc(terms.startsOn));
+    return rows.map((r) => ({ ...r, semester: r.semester === 2 ? 2 : 1 }));
   }
 
   @Get('academic-years')
@@ -158,7 +178,7 @@ export class AcademicsController {
   async createClassSet(@Body(new ZodPipe(bulkClassesSchema)) body: BulkClassesInput) {
     const [programme] = await this.db.select().from(programmes).where(eq(programmes.id, body.programmeId));
     if (!programme) throw new NotFoundException('Programme not found');
-    if (!programme.code) throw new BadRequestException('Give this programme a short code (e.g. SCI) first');
+    if (!programme.code) throw new BadRequestException('Give this programme a code (e.g. BUS) first');
     const values = body.forms.flatMap((form) =>
       Array.from({ length: body.streams }, (_, i) => ({
         name: className(form, programme.code!, i + 1),
@@ -171,8 +191,89 @@ export class AcademicsController {
       .insert(classes)
       .values(values)
       .onConflictDoNothing({ target: classes.name })
-      .returning({ name: classes.name });
+      .returning({ id: classes.id, name: classes.name });
+    // Give each new class the subjects its options need, ready for teachers to be assigned.
+    for (const c of created) await this.curriculum.syncClassSubjects(c.id);
     return { created: created.map((c) => c.name), skipped: values.length - created.length };
+  }
+
+  /** Adds the core subjects and option electives a class needs (keeps existing teachers). */
+  @RequirePermissions('academics:manage')
+  @Post('classes/:id/sync-subjects')
+  async syncSubjects(@Param('id', ParseUUIDPipe) id: string) {
+    return { added: await this.curriculum.syncClassSubjects(id) };
+  }
+
+  // ── Options (subject combinations) ────────────────────────────────────────
+
+  @Get('combinations')
+  async listCombinations(@Query('programmeId') programmeId?: string): Promise<SubjectCombination[]> {
+    const valid = programmeId && z.uuid().safeParse(programmeId).success ? programmeId : undefined;
+    const rows = await this.db
+      .select({ c: subjectCombinations, subjectId: subjects.id, subjectName: subjects.name })
+      .from(subjectCombinations)
+      .leftJoin(combinationSubjects, eq(combinationSubjects.combinationId, subjectCombinations.id))
+      .leftJoin(subjects, eq(subjects.id, combinationSubjects.subjectId))
+      .where(valid ? eq(subjectCombinations.programmeId, valid) : undefined)
+      .orderBy(asc(subjectCombinations.programmeId), asc(subjectCombinations.option), asc(subjects.name));
+    const byId = new Map<string, SubjectCombination>();
+    for (const r of rows) {
+      const c =
+        byId.get(r.c.id) ??
+        byId
+          .set(r.c.id, {
+            id: r.c.id,
+            programmeId: r.c.programmeId,
+            option: r.c.option,
+            stream: r.c.stream,
+            letter: r.c.letter,
+            mustDropOne: r.c.mustDropOne,
+            electives: [],
+          })
+          .get(r.c.id)!;
+      if (r.subjectId && r.subjectName) c.electives.push({ id: r.subjectId, name: r.subjectName });
+    }
+    return [...byId.values()];
+  }
+
+  @RequirePermissions('academics:manage')
+  @Post('combinations')
+  async createCombination(@Body(new ZodPipe(combinationSchema)) body: CombinationInput) {
+    return this.db.transaction(async (tx) => {
+      const { electiveSubjectIds, ...values } = body;
+      const [row] = await tx.insert(subjectCombinations).values(values).returning();
+      await tx.insert(combinationSubjects).values([...new Set(electiveSubjectIds)].map((subjectId) => ({ combinationId: row.id, subjectId })));
+      return row;
+    });
+  }
+
+  @RequirePermissions('academics:manage')
+  @Delete('combinations/:id')
+  @HttpCode(204)
+  async deleteCombination(@Param('id', ParseUUIDPipe) id: string) {
+    // Students on this option keep their class and fall back to the class's subjects.
+    await this.db.delete(subjectCombinations).where(eq(subjectCombinations.id, id));
+  }
+
+  @Get('programmes/:id/core-exclusions')
+  async coreExclusions(@Param('id', ParseUUIDPipe) id: string) {
+    const rows = await this.db
+      .select({ id: programmeCoreExclusions.subjectId })
+      .from(programmeCoreExclusions)
+      .where(eq(programmeCoreExclusions.programmeId, id));
+    return { subjectIds: rows.map((r) => r.id) };
+  }
+
+  @RequirePermissions('academics:manage')
+  @Put('programmes/:id/core-exclusions')
+  async setCoreExclusions(@Param('id', ParseUUIDPipe) id: string, @Body(new ZodPipe(coreExclusionsSchema)) body: { subjectIds: string[] }) {
+    await this.db.transaction(async (tx) => {
+      await tx.delete(programmeCoreExclusions).where(eq(programmeCoreExclusions.programmeId, id));
+      if (body.subjectIds.length) {
+        await tx.insert(programmeCoreExclusions).values(body.subjectIds.map((subjectId) => ({ programmeId: id, subjectId })));
+      }
+    });
+    return this.coreExclusions(id);
   }
 
   @RequirePermissions('academics:manage')
@@ -188,11 +289,15 @@ export class AcademicsController {
 
   /** Class list for teachers of the class and school leadership. Students and parents cannot list classmates. */
   @Get('classes/:id/students')
-  async classStudents(@CurrentUser() user: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
+  async classStudents(@CurrentUser() user: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Query('subjectId') subjectId?: string) {
     if (user.role !== 'teacher' && !isLeadership(user.role)) throw new NotFoundException('Class not found');
     await this.access.assertCanReadClass(user, id);
-    const rows = await this.db.select({ id: students.id }).from(students).where(eq(students.classId, id));
-    return this.me.studentSummaries({ studentIds: rows.map((r) => r.id) });
+    // With ?subjectId, only students whose option includes that subject (e.g. for a mark sheet).
+    const ids =
+      subjectId && z.uuid().safeParse(subjectId).success
+        ? await this.curriculum.studentIdsTakingSubject(id, subjectId)
+        : (await this.db.select({ id: students.id }).from(students).where(eq(students.classId, id))).map((r) => r.id);
+    return this.me.studentSummaries({ studentIds: ids });
   }
 
   @Get('classes/:id/subjects')
@@ -205,7 +310,23 @@ export class AcademicsController {
   @Get('me/subjects')
   async mySubjects(@CurrentUser() user: AuthUser, @Query('studentId') studentId?: string): Promise<SubjectWithTeacher[]> {
     const student = await this.access.resolveOwnStudent(user, studentId);
-    return this.subjectsFor(eq(classSubjects.classId, student.classId));
+    const ids = await this.curriculum.subjectIdsForStudent(student.id);
+    if (!ids.length) return [];
+    return this.db
+      .select({
+        classSubjectId: classSubjects.id,
+        subjectId: subjects.id,
+        code: subjects.code,
+        name: subjects.name,
+        isCore: subjects.isCore,
+        teacherId: classSubjects.teacherId,
+        teacherName: users.fullName,
+      })
+      .from(subjects)
+      .leftJoin(classSubjects, and(eq(classSubjects.subjectId, subjects.id), eq(classSubjects.classId, student.classId)))
+      .leftJoin(users, eq(users.id, classSubjects.teacherId))
+      .where(inArray(subjects.id, ids))
+      .orderBy(desc(subjects.isCore), asc(subjects.name));
   }
 
   /** Every class-subject the signed-in teacher is assigned to. */

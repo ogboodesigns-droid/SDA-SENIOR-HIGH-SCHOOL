@@ -31,6 +31,10 @@ export class NotificationsService {
     if (type === 'role') {
       return (await this.db.select({ id: users.id }).from(users).where(and(active, eq(users.role, ref as Role)))).map((r) => r.id);
     }
+    if (type === 'house') {
+      const rows = await this.db.select({ id: students.id }).from(students).where(eq(students.houseId, ref!));
+      return this.studentAndGuardianUserIds(rows.map((r) => r.id));
+    }
     let classCond: SQL;
     if (type === 'class') classCond = eq(classes.id, ref!);
     else if (type === 'form') classCond = eq(classes.form, Number(ref));

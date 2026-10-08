@@ -26,6 +26,7 @@ import {
   NOTIFICATION_TYPES,
   ROLES,
   SUBMISSION_STATUSES,
+  type AssessmentSchemes,
   type GradeBand,
 } from '@sda-shs/shared';
 
@@ -132,7 +133,9 @@ export const schoolProfile = pgTable('school_profile', {
   email: text('email'),
   website: text('website'),
   logoUrl: text('logo_url'),
-  gradingScale: jsonb('grading_scale').$type<{ caMax: number; examMax: number; bands: GradeBand[] }>(),
+  gradingScale: jsonb('grading_scale').$type<{ bands: GradeBand[] }>(),
+  /** Assessment components and weights for semester 1 and semester 2. */
+  assessmentSchemes: jsonb('assessment_schemes').$type<AssessmentSchemes>(),
   updatedAt: updatedAt(),
 });
 
@@ -151,11 +154,14 @@ export const terms = pgTable(
       .notNull()
       .references(() => academicYears.id, { onDelete: 'restrict' }),
     name: text('name').notNull(),
+    /** 1 or 2: the school runs two semesters per academic year. */
+    semester: smallint('semester').notNull().default(1),
     startsOn: date('starts_on').notNull(),
     endsOn: date('ends_on').notNull(),
     isCurrent: boolean('is_current').notNull().default(false),
   },
   (t) => [
+    check('terms_semester_range', sql`${t.semester} in (1, 2)`),
     uniqueIndex('terms_year_name_unique').on(t.academicYearId, t.name),
     // At most one current term.
     uniqueIndex('terms_single_current').on(t.isCurrent).where(sql`${t.isCurrent}`),
@@ -167,7 +173,78 @@ export const programmes = pgTable('programmes', {
   name: text('name').notNull().unique(),
   /** Short code used in class names: "SCI" in "1 SCI 2". Required by the API for new programmes. */
   code: text('code').unique(),
+  /** What people call the classes: "Arts" → "Arts 1", "Arts 2". */
+  label: text('label'),
 });
+
+/** Core subjects a programme doesn't take (e.g. Science students don't take General Science). */
+export const programmeCoreExclusions = pgTable(
+  'programme_core_exclusions',
+  {
+    programmeId: uuid('programme_id')
+      .notNull()
+      .references(() => programmes.id, { onDelete: 'cascade' }),
+    subjectId: uuid('subject_id')
+      .notNull()
+      .references(() => subjects.id, { onDelete: 'cascade' }),
+  },
+  (t) => [primaryKey({ columns: [t.programmeId, t.subjectId] })],
+);
+
+/**
+ * A learning-area option from the school's subject combination list, e.g.
+ * Business Option 3 = class stream 2, group A ("1BUS 2A").
+ */
+export const subjectCombinations = pgTable(
+  'subject_combinations',
+  {
+    id: id(),
+    programmeId: uuid('programme_id')
+      .notNull()
+      .references(() => programmes.id, { onDelete: 'cascade' }),
+    option: smallint('option').notNull(),
+    stream: smallint('stream').notNull(),
+    letter: text('letter').notNull().default(''),
+    mustDropOne: boolean('must_drop_one').notNull().default(false),
+  },
+  (t) => [uniqueIndex('combinations_programme_option').on(t.programmeId, t.option)],
+);
+
+export const combinationSubjects = pgTable(
+  'combination_subjects',
+  {
+    combinationId: uuid('combination_id')
+      .notNull()
+      .references(() => subjectCombinations.id, { onDelete: 'cascade' }),
+    subjectId: uuid('subject_id')
+      .notNull()
+      .references(() => subjects.id, { onDelete: 'restrict' }),
+  },
+  (t) => [primaryKey({ columns: [t.combinationId, t.subjectId] })],
+);
+
+export const houses = pgTable('houses', {
+  id: id(),
+  name: text('name').notNull().unique(),
+  colour: text('colour'),
+});
+
+export const housePoints = pgTable(
+  'house_points',
+  {
+    id: id(),
+    houseId: uuid('house_id')
+      .notNull()
+      .references(() => houses.id, { onDelete: 'cascade' }),
+    points: integer('points').notNull(),
+    reason: text('reason').notNull(),
+    awardedBy: uuid('awarded_by')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    createdAt: createdAt(),
+  },
+  (t) => [index('house_points_house_idx').on(t.houseId)],
+);
 
 export const classes = pgTable(
   'classes',
@@ -223,6 +300,9 @@ export const students = pgTable(
     classId: uuid('class_id')
       .notNull()
       .references(() => classes.id, { onDelete: 'restrict' }),
+    /** The student's option; decides their elective subjects. */
+    combinationId: uuid('combination_id').references(() => subjectCombinations.id, { onDelete: 'set null' }),
+    houseId: uuid('house_id').references(() => houses.id, { onDelete: 'set null' }),
     dateOfBirth: date('date_of_birth'),
   },
   (t) => [index('students_class_idx').on(t.classId)],
@@ -412,8 +492,13 @@ export const results = pgTable(
     classId: uuid('class_id')
       .notNull()
       .references(() => classes.id, { onDelete: 'restrict' }),
+    /** Mark per assessment component key (each out of that component's weight). */
+    scores: jsonb('scores').$type<Record<string, number | null>>().notNull().default({}),
+    /** Sum of the non-exam components. */
     caScore: score('ca_score').notNull(),
+    /** The supervised semester assessment. */
     examScore: score('exam_score').notNull(),
+    complete: boolean('complete').notNull().default(false),
     total: score('total').notNull(),
     grade: text('grade').notNull(),
     /** WAEC numeric value, 1 (A1) … 9 (F9). */

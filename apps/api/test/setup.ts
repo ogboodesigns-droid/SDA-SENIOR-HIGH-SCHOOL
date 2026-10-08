@@ -7,7 +7,7 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import request from 'supertest';
 import type { Role } from '@sda-shs/shared';
-import { DEFAULT_GRADING_SCALE, DEFAULT_SCORE_LIMITS } from '@sda-shs/shared';
+import { DEFAULT_ASSESSMENT_SCHEMES, DEFAULT_GRADING_SCALE } from '@sda-shs/shared';
 import * as schema from '../src/database/schema';
 
 export const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL ?? 'postgres://sda_shs:sda_shs@localhost:5432/sda_shs_test';
@@ -57,17 +57,31 @@ export async function login(app: INestApplication, identifier: string, password 
   return res.body as { accessToken: string; refreshToken: string };
 }
 
+/**
+ * Component marks adding up to `total` on the default scheme
+ * (class 15, mid-sem 15, practical 10, project 20, exam 40), exam filled first.
+ */
+export function marksFor(total: number): Record<string, number> {
+  let left = total;
+  const out: Record<string, number> = {};
+  for (const c of [...DEFAULT_ASSESSMENT_SCHEMES['1']].sort((a, b) => Number(b.isExam) - Number(a.isExam))) {
+    out[c.key] = Math.min(c.weight, left);
+    left -= out[c.key];
+  }
+  return out;
+}
+
 /** A small school: two classes, one teacher per class, a student in each, and a parent for each student. */
 export async function seedSchool(db: Db) {
   await db
     .insert(schema.schoolProfile)
-    .values({ id: 1, name: 'Test School', gradingScale: { ...DEFAULT_SCORE_LIMITS, bands: DEFAULT_GRADING_SCALE } });
+    .values({ id: 1, name: 'Test School', gradingScale: { bands: DEFAULT_GRADING_SCALE }, assessmentSchemes: DEFAULT_ASSESSMENT_SCHEMES });
   const [year] = await db.insert(schema.academicYears).values({ name: '2026/2027', startsOn: '2026-09-01', endsOn: '2027-07-31' }).returning();
   const [term] = await db
     .insert(schema.terms)
     .values({ academicYearId: year.id, name: 'First Semester', startsOn: '2026-09-01', endsOn: '2026-12-18', isCurrent: true })
     .returning();
-  const [science] = await db.insert(schema.programmes).values({ name: 'General Science', code: 'SCI' }).returning();
+  const [science] = await db.insert(schema.programmes).values({ name: 'Test Science', code: 'TS' }).returning();
 
   const head = await insertUser(db, 'Head Teacher', 'head', 'head@test.local');
   const teacherA = await insertUser(db, 'Teacher A', 'teacher', 'teacher.a@test.local');

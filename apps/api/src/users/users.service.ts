@@ -14,6 +14,7 @@ import { auditLogs, classes, guardianStudents, sessions, staffProfiles, students
 import type { AuthUser } from '../common/auth-user';
 import { AuditService } from '../common/audit.service';
 import { MeService } from '../auth/me.service';
+import { CurriculumService } from '../academics/curriculum.service';
 
 @Injectable()
 export class UsersService {
@@ -21,6 +22,7 @@ export class UsersService {
     @InjectDb() private readonly db: Database,
     private readonly audit: AuditService,
     private readonly me: MeService,
+    private readonly curriculum: CurriculumService,
   ) {}
 
   /** Only a super administrator may create or change another super administrator. */
@@ -101,8 +103,16 @@ export class UsersService {
     return { ...me, ...user, guardians };
   }
 
+  /** An option must belong to the student's class (same programme and stream). */
+  private async assertOptionFits(combinationId: string | null | undefined, classId: string) {
+    if (combinationId && !(await this.curriculum.combinationFitsClass(combinationId, classId))) {
+      throw new BadRequestException("That option doesn't belong to this class");
+    }
+  }
+
   async create(actor: AuthUser, input: CreateUserInput, ip: string | null) {
     this.assertMayManage(actor, input.role);
+    if (input.student) await this.assertOptionFits(input.student.combinationId, input.student.classId);
     const passwordHash = await hash(input.temporaryPassword);
 
     const id = await this.db.transaction(async (tx) => {
@@ -122,6 +132,8 @@ export class UsersService {
           userId: user.id,
           studentNumber: input.student.studentNumber.toUpperCase(),
           classId: input.student.classId,
+          combinationId: input.student.combinationId ?? null,
+          houseId: input.student.houseId ?? null,
           dateOfBirth: input.student.dateOfBirth ?? null,
         });
       }
@@ -146,17 +158,29 @@ export class UsersService {
     if (id === actor.id && input.status === 'deactivated') {
       throw new BadRequestException('You cannot deactivate your own account');
     }
+    const { classId, combinationId, houseId, ...fields } = input;
+    const studentChanges = classId !== undefined || combinationId !== undefined || houseId !== undefined;
+    if (studentChanges) {
+      const [student] = await this.db.select().from(students).where(eq(students.userId, id));
+      if (!student) throw new BadRequestException('Only students have a class, option or house');
+      const targetClass = classId ?? student.classId;
+      // Moving class without choosing a new option clears an option that no longer fits.
+      let targetCombination = combinationId === undefined ? student.combinationId : combinationId;
+      if (combinationId === undefined && classId && targetCombination && !(await this.curriculum.combinationFitsClass(targetCombination, targetClass))) {
+        targetCombination = null;
+      }
+      await this.assertOptionFits(targetCombination, targetClass);
+      await this.db
+        .update(students)
+        .set({ classId: targetClass, combinationId: targetCombination, houseId: houseId === undefined ? student.houseId : houseId })
+        .where(eq(students.id, student.id));
+    }
     await this.db.transaction(async (tx) => {
-      const { classId, ...fields } = input;
       if (Object.keys(fields).length) {
         await tx
           .update(users)
           .set({ ...fields, email: fields.email === undefined ? undefined : (fields.email?.toLowerCase() ?? null) })
           .where(eq(users.id, id));
-      }
-      if (classId) {
-        const moved = await tx.update(students).set({ classId }).where(eq(students.userId, id)).returning({ id: students.id });
-        if (!moved.length) throw new BadRequestException('Only students can be assigned to a class');
       }
       if (input.status === 'deactivated') {
         await tx.update(sessions).set({ revokedAt: new Date() }).where(and(eq(sessions.userId, id), isNull(sessions.revokedAt)));

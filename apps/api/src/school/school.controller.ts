@@ -1,9 +1,11 @@
 import { Body, Controller, Get, Module, NotFoundException, Put, Req } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import {
+  assessmentSchemesSchema,
+  DEFAULT_ASSESSMENT_SCHEMES,
   DEFAULT_GRADING_SCALE,
-  DEFAULT_SCORE_LIMITS,
   gradingScaleSchema,
+  type AssessmentSchemesInput,
   schoolProfileSchema,
   type GradingScaleInput,
   type SchoolProfile,
@@ -30,7 +32,7 @@ export class SchoolController {
   async profile(): Promise<SchoolProfile> {
     const [row] = await this.db.select().from(schoolProfile).where(eq(schoolProfile.id, 1));
     if (!row) throw new NotFoundException('The school profile has not been set up yet');
-    const { id: _id, gradingScale: _g, updatedAt, ...rest } = row;
+    const { id: _id, gradingScale: _g, assessmentSchemes: _a, updatedAt, ...rest } = row;
     return { ...rest, updatedAt: updatedAt.toISOString() };
   }
 
@@ -58,7 +60,7 @@ export class SchoolController {
   @Get('grading-scale')
   async gradingScale(): Promise<GradingScaleInput> {
     const [row] = await this.db.select({ g: schoolProfile.gradingScale }).from(schoolProfile).where(eq(schoolProfile.id, 1));
-    return row?.g ?? { ...DEFAULT_SCORE_LIMITS, bands: DEFAULT_GRADING_SCALE };
+    return row?.g ?? { bands: DEFAULT_GRADING_SCALE };
   }
 
   @RequirePermissions('school:manage')
@@ -67,6 +69,26 @@ export class SchoolController {
     const updated = await this.db.update(schoolProfile).set({ gradingScale: body }).where(eq(schoolProfile.id, 1)).returning({ id: schoolProfile.id });
     if (!updated.length) throw new NotFoundException('Set up the school profile first');
     await this.audit.record({ actorId: user.id, action: 'school.grading_scale_updated', entityType: 'school', entityId: '1', metadata: body as unknown as Record<string, unknown>, ip: clientIp(req) });
+    return body;
+  }
+
+  /** Assessment components and weights for each semester. */
+  @Get('assessment-schemes')
+  async assessmentSchemes(): Promise<AssessmentSchemesInput> {
+    const [row] = await this.db.select({ a: schoolProfile.assessmentSchemes }).from(schoolProfile).where(eq(schoolProfile.id, 1));
+    return row?.a ?? DEFAULT_ASSESSMENT_SCHEMES;
+  }
+
+  @RequirePermissions('school:manage')
+  @Put('assessment-schemes')
+  async setAssessmentSchemes(
+    @CurrentUser() user: AuthUser,
+    @Body(new ZodPipe(assessmentSchemesSchema)) body: AssessmentSchemesInput,
+    @Req() req: Request,
+  ) {
+    const updated = await this.db.update(schoolProfile).set({ assessmentSchemes: body }).where(eq(schoolProfile.id, 1)).returning({ id: schoolProfile.id });
+    if (!updated.length) throw new NotFoundException('Set up the school profile first');
+    await this.audit.record({ actorId: user.id, action: 'school.assessment_schemes_updated', entityType: 'school', entityId: '1', ip: clientIp(req) });
     return body;
   }
 }

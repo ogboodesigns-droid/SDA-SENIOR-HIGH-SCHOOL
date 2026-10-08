@@ -37,9 +37,9 @@ export type AnnouncementPriority = (typeof ANNOUNCEMENT_PRIORITIES)[number];
  * - school: everyone
  * - role: audienceRef is a Role (e.g. "parent")
  * - form: audienceRef is "1" | "2" | "3"
- * - programme / class: audienceRef is the programme or class id
+ * - programme / class / house: audienceRef is the programme, class or house id
  */
-export const AUDIENCE_TYPES = ['school', 'role', 'form', 'programme', 'class'] as const;
+export const AUDIENCE_TYPES = ['school', 'role', 'form', 'programme', 'class', 'house'] as const;
 export type AudienceType = (typeof AUDIENCE_TYPES)[number];
 
 export const EVENT_CATEGORIES = [

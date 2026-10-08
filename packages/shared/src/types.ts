@@ -27,6 +27,10 @@ export interface StudentSummary {
   className: string;
   form: number;
   programmeName: string;
+  /** Class plus option letter as on the combination list, e.g. "1BUS 2A". */
+  groupName: string;
+  houseId: string | null;
+  houseName: string | null;
 }
 
 export interface Me {
@@ -125,7 +129,8 @@ export interface TimetableSlot {
 }
 
 export interface SubjectWithTeacher {
-  classSubjectId: string;
+  /** Null when the subject hasn't been added to the class yet (no teacher assigned). */
+  classSubjectId: string | null;
   subjectId: string;
   code: string;
   name: string;
@@ -177,6 +182,10 @@ export interface ResultRow {
   termName: string;
   caScore: number;
   examScore: number;
+  /** Mark for each assessment component, in the order of the semester's scheme. */
+  breakdown: { key: string; label: string; weight: number; score: number | null }[];
+  /** Every component has a mark; only complete results can be published. */
+  complete: boolean;
   total: number;
   grade: string;
   /** WAEC numeric value (1 = A1 … 9 = F9). */
@@ -192,7 +201,26 @@ export interface TermSummary {
   academicYearName: string;
   startsOn: string;
   endsOn: string;
+  semester: 1 | 2;
   isCurrent: boolean;
+}
+
+export interface House {
+  id: string;
+  name: string;
+  colour: string | null;
+  points: number;
+  members: number;
+}
+
+export interface SubjectCombination {
+  id: string;
+  programmeId: string;
+  option: number;
+  stream: number;
+  letter: string;
+  mustDropOne: boolean;
+  electives: { id: string; name: string }[];
 }
 
 export interface AppNotification {

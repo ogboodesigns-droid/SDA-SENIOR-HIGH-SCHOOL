@@ -1,7 +1,7 @@
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import * as schema from '../src/database/schema';
-import { createApp, login, resetDatabase, seedSchool, testDb } from './setup';
+import { createApp, login, marksFor, resetDatabase, seedSchool, testDb } from './setup';
 
 describe('classes and WAEC grading', () => {
   let app: INestApplication;
@@ -26,21 +26,21 @@ describe('classes and WAEC grading', () => {
 
   it('creates a programme’s class set named "<form> <CODE> <stream>" and skips existing ones', async () => {
     const auth = { authorization: `Bearer ${head}` };
-    const ga = await http().post('/api/v1/programmes').set(auth).send({ name: 'General Arts', code: 'ga' }).expect(201);
-    expect(ga.body.code).toBe('GA');
+    const ga = await http().post('/api/v1/programmes').set(auth).send({ name: 'General Arts', code: 'g/a' }).expect(201);
+    expect(ga.body.code).toBe('G/A');
 
     const first = await http().post('/api/v1/classes/bulk').set(auth).send({ programmeId: ga.body.id, streams: 6 }).expect(201);
     expect(first.body.created).toHaveLength(18);
-    expect(first.body.created).toContain('1 GA 1');
-    expect(first.body.created).toContain('3 GA 6');
+    expect(first.body.created).toContain('1G/A 1');
+    expect(first.body.created).toContain('3G/A 6');
 
     const again = await http().post('/api/v1/classes/bulk').set(auth).send({ programmeId: ga.body.id, forms: [1], streams: 7 }).expect(201);
-    expect(again.body).toEqual({ created: ['1 GA 7'], skipped: 6 });
+    expect(again.body).toEqual({ created: ['1G/A 7'], skipped: 6 });
 
     // Streams sort numerically, not alphabetically.
     const list = await http().get('/api/v1/classes').set(auth).expect(200);
-    const form1 = list.body.filter((c: { name: string }) => c.name.startsWith('1 GA')).map((c: { name: string }) => c.name);
-    expect(form1).toEqual(['1 GA 1', '1 GA 2', '1 GA 3', '1 GA 4', '1 GA 5', '1 GA 6', '1 GA 7']);
+    const form1 = list.body.filter((c: { name: string }) => c.name.startsWith('1G/A')).map((c: { name: string }) => c.name);
+    expect(form1).toEqual(['1G/A 1', '1G/A 2', '1G/A 3', '1G/A 4', '1G/A 5', '1G/A 6', '1G/A 7']);
 
     await http().post('/api/v1/classes/bulk').set({ authorization: `Bearer ${teacherA}` }).send({ programmeId: ga.body.id, streams: 1 }).expect(403);
   });
@@ -49,7 +49,7 @@ describe('classes and WAEC grading', () => {
     const res = await http()
       .post('/api/v1/classes')
       .set({ authorization: `Bearer ${head}` })
-      .send({ name: '1 SCI 12', form: 1, programmeId: seed.science.id })
+      .send({ name: '1G/S 12', form: 1, programmeId: seed.science.id })
       .expect(201);
     expect(res.body.stream).toBe(12);
   });
@@ -60,7 +60,7 @@ describe('classes and WAEC grading', () => {
     const rows = await http()
       .put('/api/v1/results')
       .set(auth)
-      .send({ termId: seed.term.id, classId: seed.classA.id, subjectId: seed.maths.id, entries: [{ studentId: seed.studentA.id, caScore: 25, examScore: 50 }] })
+      .send({ termId: seed.term.id, classId: seed.classA.id, subjectId: seed.maths.id, entries: [{ studentId: seed.studentA.id, scores: marksFor(75) }] })
       .expect(200);
     expect(rows.body[0]).toMatchObject({ total: 75, grade: 'A1', gradePoint: 1, remark: 'Excellent' });
 
@@ -73,7 +73,7 @@ describe('classes and WAEC grading', () => {
       const res = await http()
         .put('/api/v1/results')
         .set(auth)
-        .send({ termId: seed.term.id, classId: seed.classA.id, subjectId: seed.maths.id, entries: [{ studentId: seed.studentA.id, caScore: 20, examScore: total - 20 }] })
+        .send({ termId: seed.term.id, classId: seed.classA.id, subjectId: seed.maths.id, entries: [{ studentId: seed.studentA.id, scores: marksFor(total) }] })
         .expect(200);
       expect(res.body[0]).toMatchObject({ grade, gradePoint: points });
     }
@@ -95,7 +95,7 @@ describe('classes and WAEC grading', () => {
       await http()
         .put('/api/v1/results')
         .set(auth)
-        .send({ termId: seed.term.id, classId: seed.classA.id, subjectId: s.id, entries: [{ studentId: seed.studentA.id, caScore: 20, examScore: totals[i] - 20 }] })
+        .send({ termId: seed.term.id, classId: seed.classA.id, subjectId: s.id, entries: [{ studentId: seed.studentA.id, scores: marksFor(totals[i]) }] })
         .expect(200);
     }
     await http().post('/api/v1/results/publish').set({ authorization: `Bearer ${head}` }).send({ termId: seed.term.id, classId: seed.classA.id }).expect(200);

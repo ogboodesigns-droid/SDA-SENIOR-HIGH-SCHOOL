@@ -12,6 +12,7 @@ export interface AudienceContext {
   classIds: string[];
   forms: number[];
   programmeIds: string[];
+  houseIds: string[];
   /** Leadership see everything that was ever targeted. */
   seesAll: boolean;
 }
@@ -161,7 +162,17 @@ export class AccessService {
 
   async audienceContext(user: AuthUser): Promise<AudienceContext> {
     const readable = await this.readableClassIds(user);
-    if (readable === 'all') return { role: user.role, classIds: [], forms: [], programmeIds: [], seesAll: true };
+    if (readable === 'all') return { role: user.role, classIds: [], forms: [], programmeIds: [], houseIds: [], seesAll: true };
+    // Students see their house's notices; parents see their children's houses'.
+    const studentIds =
+      user.role === 'student'
+        ? await this.studentIdForUser(user.id).then((id) => (id ? [id] : []))
+        : user.role === 'parent'
+          ? await this.childStudentIds(user.id)
+          : [];
+    const houseRows = studentIds.length
+      ? await this.db.selectDistinct({ houseId: students.houseId }).from(students).where(inArray(students.id, studentIds))
+      : [];
     const rows = readable.length
       ? await this.db
           .select({ id: classes.id, form: classes.form, programmeId: classes.programmeId })
@@ -173,6 +184,7 @@ export class AccessService {
       classIds: rows.map((r) => r.id),
       forms: [...new Set(rows.map((r) => r.form))],
       programmeIds: [...new Set(rows.map((r) => r.programmeId))],
+      houseIds: houseRows.map((h) => h.houseId).filter((h): h is string => !!h),
       seesAll: false,
     };
   }
@@ -196,6 +208,7 @@ export class AccessService {
       match('form', ctx.forms.map(String)),
       match('programme', ctx.programmeIds),
       match('class', ctx.classIds),
+      match('house', ctx.houseIds),
     );
   }
 }

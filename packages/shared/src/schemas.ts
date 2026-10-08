@@ -66,6 +66,8 @@ export const createUserSchema = z
       .object({
         studentNumber: trimmed(40),
         classId: uuid,
+        combinationId: uuid.nullish(),
+        houseId: uuid.nullish(),
         dateOfBirth: isoDate.nullish(),
       })
       .optional(),
@@ -90,6 +92,8 @@ export const updateUserSchema = z.object({
   phone: ghanaPhone.nullish(),
   status: z.enum(['active', 'deactivated']).optional(),
   classId: uuid.optional(),
+  combinationId: uuid.nullish(),
+  houseId: uuid.nullish(),
 });
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
 
@@ -131,16 +135,30 @@ export type SchoolProfileInput = z.infer<typeof schoolProfileSchema>;
 
 export const gradingScaleSchema = z
   .object({
-    caMax: z.number().positive().max(100),
-    examMax: z.number().positive().max(100),
     bands: z
       .array(z.object({ min: z.number().min(0).max(100), grade: trimmed(4), points: z.number().int().min(1).max(9), remark: trimmed(40) }))
       .min(2)
       .max(15),
   })
-  .refine((v) => v.caMax + v.examMax === 100, 'CA and exam maximums must add up to 100')
   .refine((v) => v.bands.some((b) => b.min === 0), 'One band must start at 0');
 export type GradingScaleInput = z.infer<typeof gradingScaleSchema>;
+
+const assessmentComponentSchema = z.object({
+  key: z.string().trim().regex(/^[a-z][a-z0-9_]{0,23}$/, 'Use lowercase letters, numbers and _'),
+  label: trimmed(200),
+  weight: z.number().positive().max(100),
+  isExam: z.boolean(),
+});
+
+const assessmentSchemeSchema = z
+  .array(assessmentComponentSchema)
+  .min(1)
+  .max(10)
+  .refine((cs) => Math.abs(cs.reduce((s, c) => s + c.weight, 0) - 100) < 0.001, 'The weights must add up to 100')
+  .refine((cs) => new Set(cs.map((c) => c.key)).size === cs.length, 'Each component needs a different key');
+
+export const assessmentSchemesSchema = z.object({ '1': assessmentSchemeSchema, '2': assessmentSchemeSchema });
+export type AssessmentSchemesInput = z.infer<typeof assessmentSchemesSchema>;
 
 // ── Academic structure ──────────────────────────────────────────────────────
 
@@ -152,24 +170,31 @@ export const termSchema = z
   .object({
     academicYearId: uuid,
     name: trimmed(40),
+    /** The school runs two semesters per academic year. */
+    semester: z.union([z.literal(1), z.literal(2)]),
     startsOn: isoDate,
     endsOn: isoDate,
     isCurrent: z.boolean().default(false),
   })
-  .refine((v) => v.startsOn < v.endsOn, 'The term must end after it starts');
+  .refine((v) => v.startsOn < v.endsOn, 'The semester must end after it starts');
 
-/** Short code used in class names, e.g. "SCI" in "1 SCI 2". */
+/** Code used in class names, e.g. "BUS" in "1BUS 2" or "G/A" in "2G/A 3". */
 const programmeCode = z
   .string()
   .trim()
   .toUpperCase()
-  .regex(/^[A-Z]{1,6}$/, 'Use 1–6 letters, e.g. SCI');
+  .regex(/^[A-Z][A-Z0-9/]{0,5}$/, 'Use up to 6 letters, e.g. BUS or G/A');
 
-export const programmeSchema = z.object({ name: trimmed(80), code: programmeCode });
+export const programmeSchema = z.object({
+  name: trimmed(80),
+  code: programmeCode,
+  /** What people call the classes, e.g. "Arts" for "Arts 1", "Arts 2". */
+  label: z.string().trim().max(20).nullish(),
+});
 
 /**
- * Creates the standard set of classes for a programme, named "<form> <CODE> <stream>",
- * e.g. 1 SCI 1, 1 SCI 2 … 3 SCI 2. Classes that already exist are left alone.
+ * Creates the standard set of classes for a programme, named "<form><CODE> <stream>",
+ * e.g. 1BUS 1, 1BUS 2 … 3BUS 2. Classes that already exist are left alone.
  */
 export const bulkClassesSchema = z.object({
   programmeId: uuid,
@@ -179,8 +204,45 @@ export const bulkClassesSchema = z.object({
 export type BulkClassesInput = z.infer<typeof bulkClassesSchema>;
 
 export function className(form: number, programmeCode: string, stream: number) {
-  return `${form} ${programmeCode} ${stream}`;
+  return `${form}${programmeCode} ${stream}`;
 }
+
+/**
+ * A learning-area option ("Option 3"): the elective subjects a group of
+ * students in a class takes. Its letter distinguishes the groups sharing a
+ * class, as in "1BUS 2A" and "1BUS 2B".
+ */
+export const combinationSchema = z.object({
+  programmeId: uuid,
+  option: z.number().int().min(1).max(30),
+  stream: z.number().int().min(1).max(50),
+  letter: z.string().trim().toUpperCase().max(2).default(''),
+  electiveSubjectIds: z.array(uuid).min(1).max(8),
+  /** Marked * on the combination list: the student must drop one subject before SHS 3. */
+  mustDropOne: z.boolean().default(false),
+});
+export type CombinationInput = z.infer<typeof combinationSchema>;
+
+/** Core subjects a programme does not take (Science students don't take General Science). */
+export const coreExclusionsSchema = z.object({ subjectIds: z.array(uuid).max(10) });
+
+// ── Houses ──────────────────────────────────────────────────────────────────
+
+export const houseSchema = z.object({
+  name: trimmed(60),
+  colour: z.string().trim().regex(/^#[0-9a-fA-F]{6}$/, 'Use a colour like #a00561').nullish(),
+});
+
+export const housePointsSchema = z.object({
+  points: z
+    .number()
+    .int()
+    .min(-1000)
+    .max(1000)
+    .refine((n) => n !== 0, 'Enter a non-zero number of points'),
+  reason: trimmed(200),
+});
+export type HousePointsInput = z.infer<typeof housePointsSchema>;
 
 export const classSchema = z.object({
   name: trimmed(60),
@@ -298,8 +360,8 @@ export const resultEntrySchema = z.object({
     .array(
       z.object({
         studentId: uuid,
-        caScore: z.number().min(0).max(100),
-        examScore: z.number().min(0).max(100),
+        /** Marks per assessment component key, each out of the component's weight. Null = not yet entered. */
+        scores: z.record(z.string().max(24), z.number().min(0).max(100).nullable()),
         teacherComment: optionalText(500),
       }),
     )

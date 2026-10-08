@@ -1,5 +1,5 @@
 import { Body, ConflictException, Controller, Delete, Get, HttpCode, Module, NotFoundException, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
-import { and, asc, eq, gt, lt, ne, type SQL } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, lt, ne, type SQL } from 'drizzle-orm';
 import { timetableEntrySchema, type TimetableEntryInput, type TimetableSlot } from '@sda-shs/shared';
 import { InjectDb, type Database } from '../database/database.module';
 import { classes, classSubjects, subjects, terms, timetableEntries, users } from '../database/schema';
@@ -7,12 +7,14 @@ import type { AuthUser } from '../common/auth-user';
 import { CurrentUser, RequirePermissions } from '../common/decorators';
 import { ZodPipe } from '../common/zod.pipe';
 import { AccessService } from '../access/access.service';
+import { CurriculumService } from '../academics/curriculum.service';
 
 @Controller('timetable')
 export class TimetableController {
   constructor(
     @InjectDb() private readonly db: Database,
     private readonly access: AccessService,
+    private readonly curriculum: CurriculumService,
   ) {}
 
   private async termOrCurrent(termId?: string): Promise<string | null> {
@@ -60,7 +62,12 @@ export class TimetableController {
       return this.slots(and(eq(timetableEntries.termId, term), eq(classSubjects.teacherId, user.id)));
     }
     const student = await this.access.resolveOwnStudent(user, studentId);
-    return this.slots(and(eq(timetableEntries.termId, term), eq(timetableEntries.classId, student.classId)));
+    // Elective periods for other options in the class are left out.
+    const subjectIds = await this.curriculum.subjectIdsForStudent(student.id);
+    if (!subjectIds.length) return [];
+    return this.slots(
+      and(eq(timetableEntries.termId, term), eq(timetableEntries.classId, student.classId), inArray(timetableEntries.subjectId, subjectIds)),
+    );
   }
 
   @Get('class/:classId')
@@ -86,8 +93,15 @@ export class TimetableController {
       lt(timetableEntries.startsAt, body.endsAt),
       gt(timetableEntries.endsAt, body.startsAt),
     );
-    const [classClash] = await this.db.select({ id: timetableEntries.id }).from(timetableEntries).where(and(overlaps, eq(timetableEntries.classId, body.classId))).limit(1);
-    if (classClash) throw new ConflictException('The class already has a lesson at this time');
+    const sameTime = await this.db
+      .select({ subjectId: timetableEntries.subjectId })
+      .from(timetableEntries)
+      .where(and(overlaps, eq(timetableEntries.classId, body.classId)));
+    for (const other of sameTime) {
+      if (!(await this.curriculum.canRunTogether(body.classId, body.subjectId, other.subjectId))) {
+        throw new ConflictException('The class already has a lesson at this time');
+      }
+    }
 
     if (assigned.teacherId) {
       const [teacherClash] = await this.db

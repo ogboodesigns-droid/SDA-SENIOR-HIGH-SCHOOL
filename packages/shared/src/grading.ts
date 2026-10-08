@@ -20,8 +20,6 @@ export const DEFAULT_GRADING_SCALE: GradeBand[] = [
   { min: 0, grade: 'F9', points: 9, remark: 'Fail' },
 ];
 
-/** Default weighting: continuous assessment out of 30, examination out of 70. */
-export const DEFAULT_SCORE_LIMITS = { caMax: 30, examMax: 70 };
 
 export function gradeFor(total: number, scale: GradeBand[]): GradeBand {
   const sorted = [...scale].sort((a, b) => b.min - a.min);

@@ -13,6 +13,7 @@ import { assignments, classes, files, students, subjects, submissions, users } f
 import type { AuthUser } from '../common/auth-user';
 import { AuditService } from '../common/audit.service';
 import { AccessService } from '../access/access.service';
+import { CurriculumService } from '../academics/curriculum.service';
 import { FilesService } from '../files/files.controller';
 import { NotificationsService } from '../notifications/notifications.service';
 
@@ -26,6 +27,7 @@ export class AssignmentsService {
     private readonly files: FilesService,
     private readonly notifications: NotificationsService,
     private readonly audit: AuditService,
+    private readonly curriculum: CurriculumService,
   ) {}
 
   private selectAssignments(where: SQL | undefined) {
@@ -86,7 +88,12 @@ export class AssignmentsService {
   /** A student's (or a parent's child's) assignments, newest due date first, with their own submission. */
   async forStudent(user: AuthUser, studentId?: string): Promise<AssignmentSummary[]> {
     const student = await this.access.resolveOwnStudent(user, studentId);
-    const rows = await this.selectAssignments(eq(assignments.classId, student.classId)).orderBy(desc(assignments.dueAt)).limit(200);
+    // Only subjects in the student's option: 1BUS 1A doesn't see French work set for 1BUS 1B.
+    const subjectIds = await this.curriculum.subjectIdsForStudent(student.id);
+    if (!subjectIds.length) return [];
+    const rows = await this.selectAssignments(and(eq(assignments.classId, student.classId), inArray(assignments.subjectId, subjectIds)))
+      .orderBy(desc(assignments.dueAt))
+      .limit(200);
     const subs = rows.length
       ? await this.submissionsWhere(and(eq(submissions.studentId, student.id), inArray(submissions.assignmentId, rows.map((r) => r.id)))!)
       : [];
@@ -127,7 +134,9 @@ export class AssignmentsService {
     let mine: SubmissionSummary | null = null;
     if (user.role === 'student' || user.role === 'parent') {
       const student = await this.access.resolveOwnStudent(user, studentId);
-      if (student.classId !== a.classId) throw new NotFoundException('Assignment not found');
+      if (student.classId !== a.classId || !(await this.curriculum.takesSubject(student.id, a.subjectId))) {
+        throw new NotFoundException('Assignment not found');
+      }
       [mine = null] = await this.submissionsWhere(and(eq(submissions.assignmentId, id), eq(submissions.studentId, student.id))!);
     }
     return this.toSummary(row, mine);
@@ -143,7 +152,7 @@ export class AssignmentsService {
     await this.audit.record({ actorId: user.id, action: 'assignment.created', entityType: 'assignment', entityId: row.id, ip });
 
     const [subject] = await this.db.select({ name: subjects.name }).from(subjects).where(eq(subjects.id, input.subjectId));
-    const recipients = await this.notifications.classAudienceUserIds([input.classId], { includeTeachers: false });
+    const recipients = await this.notifications.studentAndGuardianUserIds(await this.curriculum.studentIdsTakingSubject(input.classId, input.subjectId));
     await this.notifications.notify(
       recipients,
       {
@@ -183,7 +192,9 @@ export class AssignmentsService {
     if (user.role !== 'student') throw new ForbiddenException('Only students can submit assignments');
     const student = await this.access.resolveOwnStudent(user);
     const a = await this.load(id);
-    if (a.classId !== student.classId) throw new NotFoundException('Assignment not found');
+    if (a.classId !== student.classId || !(await this.curriculum.takesSubject(student.id, a.subjectId))) {
+      throw new NotFoundException('Assignment not found');
+    }
     if (input.fileId) await this.files.assertOwned(user, input.fileId);
 
     const late = new Date() > a.dueAt;

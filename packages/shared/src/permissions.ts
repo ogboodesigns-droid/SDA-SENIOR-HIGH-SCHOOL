@@ -18,6 +18,7 @@ export const PERMISSIONS = [
   'assignments:manage',
   'results:enter',
   'results:publish',
+  'houses:manage',
   'audit:read',
 ] as const;
 
@@ -35,6 +36,7 @@ const LEADERSHIP: Permission[] = [
   'assignments:manage',
   'results:enter',
   'results:publish',
+  'houses:manage',
 ];
 
 export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {

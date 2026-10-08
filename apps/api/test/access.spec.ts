@@ -1,6 +1,6 @@
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { createApp, login, resetDatabase, seedSchool, testDb } from './setup';
+import { createApp, login, marksFor, resetDatabase, seedSchool, testDb } from './setup';
 
 /**
  * Record-level access: who can see and change which student data.
@@ -102,18 +102,18 @@ describe('record-level access', () => {
         termId: seed.term.id,
         classId: seed.classA.id,
         subjectId: seed.maths.id,
-        entries: [{ studentId: seed.studentA.id, caScore: 27, examScore: 55 }],
+        entries: [{ studentId: seed.studentA.id, scores: marksFor(82) }],
       };
       await http().put('/api/v1/results').set(as('teacherB')).send(body).expect(403);
       await http()
         .put('/api/v1/results')
         .set(as('teacherA'))
-        .send({ ...body, entries: [{ studentId: seed.studentB.id, caScore: 20, examScore: 50 }] })
+        .send({ ...body, entries: [{ studentId: seed.studentB.id, scores: marksFor(70) }] })
         .expect(400);
       await http()
         .put('/api/v1/results')
         .set(as('teacherA'))
-        .send({ ...body, entries: [{ studentId: seed.studentA.id, caScore: 31, examScore: 50 }] })
+        .send({ ...body, entries: [{ studentId: seed.studentA.id, scores: { ...marksFor(70), class: 16 } }] })
         .expect(400);
 
       const sheet = await http().put('/api/v1/results').set(as('teacherA')).send(body).expect(200);
@@ -129,7 +129,7 @@ describe('record-level access', () => {
       const body = { termId: seed.term.id, classId: seed.classA.id };
       await http().post('/api/v1/results/publish').set(as('teacherA')).send(body).expect(403);
       const res = await http().post('/api/v1/results/publish').set(as('head')).send(body).expect(200);
-      expect(res.body).toEqual({ published: 1, students: 1 });
+      expect(res.body).toEqual({ published: 1, students: 1, incomplete: 0 });
     });
 
     it('published results reach the student and their parent only', async () => {
@@ -151,7 +151,7 @@ describe('record-level access', () => {
       await http()
         .put('/api/v1/results')
         .set(as('teacherA'))
-        .send({ termId: seed.term.id, classId: seed.classA.id, subjectId: seed.maths.id, entries: [{ studentId: seed.studentA.id, caScore: 30, examScore: 70 }] })
+        .send({ termId: seed.term.id, classId: seed.classA.id, subjectId: seed.maths.id, entries: [{ studentId: seed.studentA.id, scores: marksFor(100) }] })
         .expect(403);
     });
   });

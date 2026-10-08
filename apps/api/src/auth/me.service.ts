@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { eq, inArray } from 'drizzle-orm';
 import { ROLE_PERMISSIONS, type Me, type StudentSummary } from '@sda-shs/shared';
 import { InjectDb, type Database } from '../database/database.module';
-import { classes, guardianStudents, programmes, students, users } from '../database/schema';
+import { classes, guardianStudents, houses, programmes, students, subjectCombinations, users } from '../database/schema';
 
 @Injectable()
 export class MeService {
@@ -11,7 +11,7 @@ export class MeService {
   async studentSummaries(where: { userId?: string; studentIds?: string[] }): Promise<StudentSummary[]> {
     const cond = where.userId ? eq(students.userId, where.userId) : inArray(students.id, where.studentIds ?? []);
     if (where.studentIds && !where.studentIds.length) return [];
-    return this.db
+    const rows = await this.db
       .select({
         id: students.id,
         userId: students.userId,
@@ -21,13 +21,20 @@ export class MeService {
         className: classes.name,
         form: classes.form,
         programmeName: programmes.name,
+        letter: subjectCombinations.letter,
+        houseId: houses.id,
+        houseName: houses.name,
       })
       .from(students)
       .innerJoin(users, eq(users.id, students.userId))
       .innerJoin(classes, eq(classes.id, students.classId))
       .innerJoin(programmes, eq(programmes.id, classes.programmeId))
+      .leftJoin(subjectCombinations, eq(subjectCombinations.id, students.combinationId))
+      .leftJoin(houses, eq(houses.id, students.houseId))
       .where(cond)
       .orderBy(users.fullName);
+    // "1BUS 2" + option letter "A" → "1BUS 2A", as on the combination list.
+    return rows.map(({ letter, ...r }) => ({ ...r, groupName: `${r.className}${letter ?? ''}` }));
   }
 
   async build(userId: string): Promise<Me> {

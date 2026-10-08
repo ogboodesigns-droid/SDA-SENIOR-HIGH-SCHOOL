@@ -3,7 +3,8 @@ import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { count, eq, sql } from 'drizzle-orm';
 import { AccessModule } from './access/access.service';
-import { AcademicsModule } from './academics/academics.module';
+import { AcademicsModule, CurriculumModule } from './academics/academics.module';
+import { HousesModule } from './houses/houses.controller';
 import { AnnouncementsModule } from './announcements/announcements.controller';
 import { AssignmentsModule } from './assignments/assignments.controller';
 import { AuthModule } from './auth/auth.module';
@@ -56,6 +57,7 @@ class HealthController {
     DatabaseModule,
     AuditModule,
     AccessModule,
+    CurriculumModule,
     AuthModule,
     NotificationsModule,
     FilesModule,
@@ -67,6 +69,7 @@ class HealthController {
     EventsModule,
     AssignmentsModule,
     ResultsModule,
+    HousesModule,
   ],
   controllers: [HealthController],
   providers: [
