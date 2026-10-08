@@ -6,6 +6,7 @@ import {
   classSubjects,
   combinationSubjects,
   programmeCoreExclusions,
+  programmes,
   students,
   subjectCombinations,
   subjects,
@@ -122,39 +123,44 @@ export class CurriculumService {
   }
 
   /**
-   * Whether two subjects can be timetabled in the same period for a class:
-   * only electives that no option of the class takes together (e.g. French
-   * for one group while the other group has Art & Design Studio).
+   * Whether two subjects may share a period in a class ("split" periods such
+   * as GEOGRAPHY / COMPUTING). Core subjects never share; two electives may,
+   * and the options whose students take both are returned so the timetable
+   * can warn about them.
    */
-  async canRunTogether(classId: string, subjectA: string, subjectB: string): Promise<boolean> {
-    if (subjectA === subjectB) return false;
-    const [cls] = await this.db.select().from(classes).where(eq(classes.id, classId));
-    if (!cls || cls.stream === null) return false;
+  async splitCheck(classId: string, subjectA: string, subjectB: string): Promise<{ allowed: boolean; clashingOptions: string[] }> {
+    if (subjectA === subjectB) return { allowed: false, clashingOptions: [] };
+    const [cls] = await this.db
+      .select({ c: classes, code: programmes.code })
+      .from(classes)
+      .innerJoin(programmes, eq(programmes.id, classes.programmeId))
+      .where(eq(classes.id, classId));
+    if (!cls) return { allowed: false, clashingOptions: [] };
     const core = await this.db
       .select({ id: subjects.id })
       .from(subjects)
       .where(and(inArray(subjects.id, [subjectA, subjectB]), eq(subjects.isCore, true)));
-    if (core.length) return false;
-    const options = await this.db
-      .select({ id: subjectCombinations.id })
+    if (core.length) return { allowed: false, clashingOptions: [] };
+    if (cls.c.stream === null) return { allowed: true, clashingOptions: [] };
+
+    const rows = await this.db
+      .select({ id: subjectCombinations.id, option: subjectCombinations.option, letter: subjectCombinations.letter, subjectId: combinationSubjects.subjectId })
       .from(subjectCombinations)
-      .where(and(eq(subjectCombinations.programmeId, cls.programmeId), eq(subjectCombinations.stream, cls.stream)));
-    if (!options.length) return false;
-    const pairs = await this.db
-      .select({ combinationId: combinationSubjects.combinationId })
-      .from(combinationSubjects)
+      .innerJoin(combinationSubjects, eq(combinationSubjects.combinationId, subjectCombinations.id))
       .where(
         and(
-          inArray(
-            combinationSubjects.combinationId,
-            options.map((o) => o.id),
-          ),
+          eq(subjectCombinations.programmeId, cls.c.programmeId),
+          eq(subjectCombinations.stream, cls.c.stream),
           inArray(combinationSubjects.subjectId, [subjectA, subjectB]),
         ),
       );
-    const perOption = new Map<string, number>();
-    for (const p of pairs) perOption.set(p.combinationId, (perOption.get(p.combinationId) ?? 0) + 1);
-    return ![...perOption.values()].some((n) => n === 2);
+    const perOption = new Map<string, { label: string; n: number }>();
+    for (const r of [...rows].sort((a, b) => a.option - b.option)) {
+      const cur = perOption.get(r.id) ?? { label: `Option ${r.option} (${cls.c.name}${r.letter})`, n: 0 };
+      cur.n += 1;
+      perOption.set(r.id, cur);
+    }
+    return { allowed: true, clashingOptions: [...perOption.values()].filter((o) => o.n === 2).map((o) => o.label) };
   }
 
   /** Options a student in this class can be placed in (same programme and stream). */

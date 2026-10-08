@@ -27,6 +27,7 @@ import {
   ROLES,
   SUBMISSION_STATUSES,
   type AssessmentSchemes,
+  type BellSchedule,
   type GradeBand,
 } from '@sda-shs/shared';
 
@@ -136,6 +137,8 @@ export const schoolProfile = pgTable('school_profile', {
   gradingScale: jsonb('grading_scale').$type<{ bands: GradeBand[] }>(),
   /** Assessment components and weights for semester 1 and semester 2. */
   assessmentSchemes: jsonb('assessment_schemes').$type<AssessmentSchemes>(),
+  /** Periods, breaks and school-wide activities of the school day. */
+  bellSchedule: jsonb('bell_schedule').$type<BellSchedule>(),
   updatedAt: updatedAt(),
 });
 
@@ -175,6 +178,8 @@ export const programmes = pgTable('programmes', {
   code: text('code').unique(),
   /** What people call the classes: "Arts" → "Arts 1", "Arts 2". */
   label: text('label'),
+  /** Class names have a space after the form: "1 LANG 1" rather than "1LANG 1". */
+  spacedName: boolean('spaced_name').notNull().default(false),
 });
 
 /** Core subjects a programme doesn't take (e.g. Science students don't take General Science). */

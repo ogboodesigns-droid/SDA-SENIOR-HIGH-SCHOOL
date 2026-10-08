@@ -2,7 +2,10 @@ import { Body, Controller, Get, Module, NotFoundException, Put, Req } from '@nes
 import { eq } from 'drizzle-orm';
 import {
   assessmentSchemesSchema,
+  bellScheduleSchema,
   DEFAULT_ASSESSMENT_SCHEMES,
+  DEFAULT_BELL_SCHEDULE,
+  type BellSchedule,
   DEFAULT_GRADING_SCALE,
   gradingScaleSchema,
   type AssessmentSchemesInput,
@@ -32,7 +35,7 @@ export class SchoolController {
   async profile(): Promise<SchoolProfile> {
     const [row] = await this.db.select().from(schoolProfile).where(eq(schoolProfile.id, 1));
     if (!row) throw new NotFoundException('The school profile has not been set up yet');
-    const { id: _id, gradingScale: _g, assessmentSchemes: _a, updatedAt, ...rest } = row;
+    const { id: _id, gradingScale: _g, assessmentSchemes: _a, bellSchedule: _b, updatedAt, ...rest } = row;
     return { ...rest, updatedAt: updatedAt.toISOString() };
   }
 
@@ -69,6 +72,22 @@ export class SchoolController {
     const updated = await this.db.update(schoolProfile).set({ gradingScale: body }).where(eq(schoolProfile.id, 1)).returning({ id: schoolProfile.id });
     if (!updated.length) throw new NotFoundException('Set up the school profile first');
     await this.audit.record({ actorId: user.id, action: 'school.grading_scale_updated', entityType: 'school', entityId: '1', metadata: body as unknown as Record<string, unknown>, ip: clientIp(req) });
+    return body;
+  }
+
+  /** Periods, breaks and school-wide activities (PLC/VLC, early close). */
+  @Get('bell-schedule')
+  async bellSchedule(): Promise<BellSchedule> {
+    const [row] = await this.db.select({ b: schoolProfile.bellSchedule }).from(schoolProfile).where(eq(schoolProfile.id, 1));
+    return row?.b ?? DEFAULT_BELL_SCHEDULE;
+  }
+
+  @RequirePermissions('timetable:manage')
+  @Put('bell-schedule')
+  async setBellSchedule(@CurrentUser() user: AuthUser, @Body(new ZodPipe(bellScheduleSchema)) body: BellSchedule, @Req() req: Request) {
+    const updated = await this.db.update(schoolProfile).set({ bellSchedule: body }).where(eq(schoolProfile.id, 1)).returning({ id: schoolProfile.id });
+    if (!updated.length) throw new NotFoundException('Set up the school profile first');
+    await this.audit.record({ actorId: user.id, action: 'school.bell_schedule_updated', entityType: 'school', entityId: '1', ip: clientIp(req) });
     return body;
   }
 

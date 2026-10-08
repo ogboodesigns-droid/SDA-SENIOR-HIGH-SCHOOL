@@ -12,7 +12,7 @@ The product specification is split into three releases. V1 is built in this repo
 | Bottom navigation (§4) | ✅ | Home · Academics · Updates · Calendar · Profile |
 | School profile (§5) | ✅ | Fully editable, nothing invented |
 | News & announcements (§6) | ✅ | 12 categories, targeting, scheduling, expiry, priority, push |
-| Timetable (§7) | ✅ | Per class/term, clash detection, personal view |
+| Timetable (§7) | ✅ | Grid like the school's master timetables (bell schedule, breaks, PLC / VLC), split periods, clash warnings, periods per week, personal day view |
 | Student academic portal (§8) | ✅ | Subjects from the student's option, with teachers |
 | House system (§17) | ✅ (basic, from V2) | The four houses, membership, points table with history, house notices. Competitions and achievements to follow |
 | Assignments (§9) | ✅ | Text and file submissions, late flag, marking with feedback |
@@ -51,7 +51,8 @@ The product specification is split into three releases. V1 is built in this repo
 - ~~Official name, logo, motto, address~~ ✅ provided. Still needed: vision, mission, core values, history, phone/email and leadership
 - ~~Grading scale and assessment modes~~ ✅ WASSCE; 15/15/10/20/40. Still needed: whether class positions are published
 - ~~Houses~~ ✅ Gye Nyame, Asokore, Agyei Sarfo, Kuma Korante. Optional: house colours and house masters/mistresses
-- ~~Programme codes, options and subjects~~ ✅ from the 2026/27 combination lists. Still needed: the number of classes in SHS 2 and SHS 3 for each learning area, and whether Languages classes are "1L 1" or "1L1" (the list shows "1L1 1A" and "1L2 2A")
+- ~~Programme codes, options, subjects, classes per form~~ ✅ (same classes and options for SHS 1–3; Languages written "1 LANG 1A")
+- Teacher accounts for the staff on the timetables, so they can be assigned to class subjects (`db:sample-timetables` prints the list)
 - Subjects and teacher assignments; academic calendar
 - Houses, clubs and religious programme structure (V2)
 - Fees structure and official payment provider details (V2, before any payment integration)

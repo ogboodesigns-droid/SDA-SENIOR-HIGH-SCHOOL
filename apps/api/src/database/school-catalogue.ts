@@ -7,7 +7,8 @@
  * Subject codes are internal identifiers chosen for the system; the names are
  * as printed on the combination list.
  */
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
+import { className } from '@sda-shs/shared';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from './schema';
 
@@ -52,6 +53,9 @@ interface ProgrammeDef {
   name: string;
   code: string;
   label: string;
+  spacedName?: boolean;
+  /** Classes per form (SHS 1–3): Arts 1–4, Bus 1–2, H/Econs 1–3, Lang 1–2, Science 1, Visual 1–2. */
+  classesPerForm: number;
   /** Core subjects this learning area does not offer. */
   excludeCore?: string[];
   /** [option, stream, letter, elective codes, must drop one before SHS 3] */
@@ -61,6 +65,7 @@ interface ProgrammeDef {
 export const PROGRAMMES: ProgrammeDef[] = [
   {
     name: 'General Science',
+    classesPerForm: 1,
     code: 'G/S',
     label: 'Science',
     // "Science Students will not offer General Science as a Core Subject."
@@ -77,6 +82,7 @@ export const PROGRAMMES: ProgrammeDef[] = [
   },
   {
     name: 'General Arts',
+    classesPerForm: 4,
     code: 'G/A',
     label: 'Arts',
     options: [
@@ -91,6 +97,7 @@ export const PROGRAMMES: ProgrammeDef[] = [
   },
   {
     name: 'Visual Arts',
+    classesPerForm: 2,
     code: 'VIS',
     label: 'Visual',
     options: [
@@ -103,6 +110,7 @@ export const PROGRAMMES: ProgrammeDef[] = [
   },
   {
     name: 'Business',
+    classesPerForm: 2,
     code: 'BUS',
     label: 'Bus',
     options: [
@@ -115,6 +123,7 @@ export const PROGRAMMES: ProgrammeDef[] = [
   },
   {
     name: 'Home Economics',
+    classesPerForm: 3,
     code: 'H/E',
     label: 'H/Econs',
     options: [
@@ -132,7 +141,10 @@ export const PROGRAMMES: ProgrammeDef[] = [
   },
   {
     name: 'Languages',
-    code: 'L',
+    classesPerForm: 2,
+    // The school writes these "1 LANG 1A", "1 LANG 2A".
+    code: 'LANG',
+    spacedName: true,
     label: 'Lang',
     options: [
       [1, 1, 'A', ['TWI', 'LIT', 'FREN', 'ICT', 'PA']],
@@ -162,7 +174,7 @@ export async function loadSchoolCatalogue(db: Db) {
   };
 
   for (const p of PROGRAMMES) {
-    await db.insert(schema.programmes).values({ name: p.name, code: p.code, label: p.label }).onConflictDoNothing();
+    await db.insert(schema.programmes).values({ name: p.name, code: p.code, label: p.label, spacedName: p.spacedName ?? false }).onConflictDoNothing();
     const [programme] = await db.select().from(schema.programmes).where(eq(schema.programmes.name, p.name));
     if (!programme) continue;
 
@@ -186,6 +198,8 @@ export async function loadSchoolCatalogue(db: Db) {
     }
   }
 
+  await createClasses(db);
+
   await db
     .insert(schema.houses)
     .values(HOUSES.map((name) => ({ name })))
@@ -194,9 +208,52 @@ export async function loadSchoolCatalogue(db: Db) {
   const counts = {
     subjects: subjectRows.length,
     programmes: (await db.select({ id: schema.programmes.id }).from(schema.programmes).where(inArray(schema.programmes.name, PROGRAMMES.map((p) => p.name)))).length,
+    classes: (await db.select({ id: schema.classes.id }).from(schema.classes)).length,
     houses: (await db.select({ id: schema.houses.id }).from(schema.houses).where(inArray(schema.houses.name, HOUSES))).length,
   };
   return counts;
+}
+
+/**
+ * Every learning area's classes for SHS 1–3, each given the core subjects its
+ * learning area offers and the electives of its options. Existing classes
+ * and subject assignments (with their teachers) are kept.
+ */
+async function createClasses(db: Db) {
+  const coreRows = await db.select({ id: schema.subjects.id }).from(schema.subjects).where(eq(schema.subjects.isCore, true));
+  for (const p of PROGRAMMES) {
+    const [programme] = await db.select().from(schema.programmes).where(eq(schema.programmes.name, p.name));
+    if (!programme?.code) continue;
+    const excluded = new Set(
+      (
+        await db
+          .select({ id: schema.programmeCoreExclusions.subjectId })
+          .from(schema.programmeCoreExclusions)
+          .where(eq(schema.programmeCoreExclusions.programmeId, programme.id))
+      ).map((r) => r.id),
+    );
+    const core = coreRows.map((r) => r.id).filter((id) => !excluded.has(id));
+
+    for (const form of [1, 2, 3]) {
+      for (let stream = 1; stream <= p.classesPerForm; stream++) {
+        const name = className(form, programme.code, stream, programme.spacedName);
+        await db.insert(schema.classes).values({ name, form, stream, programmeId: programme.id }).onConflictDoNothing();
+        const [cls] = await db.select({ id: schema.classes.id }).from(schema.classes).where(eq(schema.classes.name, name));
+        const electives = await db
+          .selectDistinct({ id: schema.combinationSubjects.subjectId })
+          .from(schema.combinationSubjects)
+          .innerJoin(schema.subjectCombinations, eq(schema.subjectCombinations.id, schema.combinationSubjects.combinationId))
+          .where(and(eq(schema.subjectCombinations.programmeId, programme.id), eq(schema.subjectCombinations.stream, stream)));
+        const subjectIds = [...new Set([...core, ...electives.map((e) => e.id)])];
+        if (subjectIds.length) {
+          await db
+            .insert(schema.classSubjects)
+            .values(subjectIds.map((subjectId) => ({ classId: cls.id, subjectId })))
+            .onConflictDoNothing();
+        }
+      }
+    }
+  }
 }
 
 if (require.main === module) {
@@ -209,7 +266,7 @@ if (require.main === module) {
     const pool = new Pool({ connectionString: url, max: 1 });
     try {
       const counts = await loadSchoolCatalogue(drizzle(pool, { schema }));
-      console.log(`School catalogue loaded: ${counts.subjects} subjects, ${counts.programmes} learning areas, ${counts.houses} houses.`);
+      console.log(`School catalogue loaded: ${counts.subjects} subjects, ${counts.programmes} learning areas, ${counts.classes} classes, ${counts.houses} houses.`);
     } finally {
       await pool.end();
     }

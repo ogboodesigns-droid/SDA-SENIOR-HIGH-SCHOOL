@@ -6,7 +6,7 @@ import { api, errorMessage, formatDate, useApi } from '@/lib/api';
 import { Alert, blankToNull, Card, Empty, Field, Loading, PageHeader, useSubmit } from '@/components/ui';
 
 interface Year { id: string; name: string; startsOn: string; endsOn: string }
-interface Programme { id: string; name: string; code: string | null; label: string | null }
+interface Programme { id: string; name: string; code: string | null; label: string | null; spacedName: boolean }
 interface ClassRow { id: string; name: string; form: number; programmeId: string; programmeName: string; formMasterId: string | null; formMasterName: string | null }
 interface Subject { id: string; code: string; name: string; isCore: boolean }
 
@@ -109,7 +109,8 @@ function ProgrammeRow({
   const [forms, setForms] = useState([1, 2, 3]);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<{ kind: 'error' | 'success'; text: string } | null>(null);
-  const preview = code && streams ? `${forms[0] ?? 1}${code.toUpperCase()} 1 … ${forms[forms.length - 1] ?? 3}${code.toUpperCase()} ${streams}` : '';
+  const gap = existing?.spacedName ? ' ' : '';
+  const preview = code && streams ? `${forms[0] ?? 1}${gap}${code.toUpperCase()} 1 … ${forms[forms.length - 1] ?? 3}${gap}${code.toUpperCase()} ${streams}` : '';
 
   async function create() {
     setBusy(true);
@@ -198,7 +199,7 @@ function ProgrammesCard({ onChange }: { onChange: () => void }) {
   return (
     <Card title="Learning areas & classes">
       <p className="muted" style={{ marginTop: 0 }}>
-        Classes are named <strong>form, code, class number</strong> as on the subject combination list: 1BUS 1, 2G/A 3, 3VIS 2. The option letter
+        Classes are named <strong>form, code, class number</strong> as on the subject combination list: 1BUS 1, 2G/A 3, 3VIS 2, 1 LANG 2. The option letter
         (the A in 1BUS 1A) comes from each student&apos;s option. Classes per form starts from the number of classes on the combination list; change
         it and tick the forms to create a different number for SHS 2 and 3. Running it again only adds missing classes.
       </p>
@@ -291,7 +292,7 @@ function OptionsCard() {
                       Option {c.option}
                       {c.mustDropOne && <span title="Must drop one subject before SHS 3"> *</span>}
                     </td>
-                    <td style={{ whiteSpace: 'nowrap' }}>{`1${programme?.code ?? ''} ${c.stream}${c.letter}`}</td>
+                    <td style={{ whiteSpace: 'nowrap' }}>{`1${programme?.spacedName ? ' ' : ''}${programme?.code ?? ''} ${c.stream}${c.letter}`}</td>
                     <td>{c.electives.map((e) => e.name).join(', ')}</td>
                     <td>
                       <button
@@ -371,8 +372,8 @@ function ClassesCard({ version, onChange }: { version: number; onChange: () => v
             </option>
           ))}
         </select>
-        <select name="formMasterId" style={{ maxWidth: 220 }} aria-label="Form master/mistress" defaultValue="">
-          <option value="">No form master yet</option>
+        <select name="formMasterId" style={{ maxWidth: 220 }} aria-label="Form parent" defaultValue="">
+          <option value="">No form parent yet</option>
           {teachers.data?.items.map((t) => (
             <option key={t.id} value={t.id}>
               {t.fullName}
@@ -390,7 +391,7 @@ function ClassesCard({ version, onChange }: { version: number; onChange: () => v
               <tr>
                 <th>Class</th>
                 <th>Programme</th>
-                <th>Form master/mistress</th>
+                <th>Form parent</th>
               </tr>
             </thead>
             <tbody>
@@ -401,7 +402,7 @@ function ClassesCard({ version, onChange }: { version: number; onChange: () => v
                   <td>
                     <select
                       defaultValue={c.formMasterId ?? ''}
-                      aria-label={`Form master for ${c.name}`}
+                      aria-label={`Form parent for ${c.name}`}
                       onChange={(e) => api(`/classes/${c.id}`, { method: 'PATCH', body: { formMasterId: e.target.value || null } }).then(classes.reload)}
                     >
                       <option value="">—</option>

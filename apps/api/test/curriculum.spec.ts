@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import request from 'supertest';
 import * as schema from '../src/database/schema';
 import { loadSchoolCatalogue } from '../src/database/school-catalogue';
+import { loadSampleTimetables } from '../src/database/sample-timetables';
 import { createApp, insertUser, login, marksFor, PASSWORD, resetDatabase, seedSchool, testDb } from './setup';
 
 /** Learning-area options (subject combinations), houses and component marks, using the school's real catalogue. */
@@ -43,23 +44,45 @@ describe('options, houses and semester assessment', () => {
   it('loads the catalogue from the combination list, and loading again changes nothing', async () => {
     const first = await loadSchoolCatalogue(db);
     const again = await loadSchoolCatalogue(db);
-    expect(first).toEqual({ subjects: 30, programmes: 6, houses: 4 }); // 29 from the list + the test's maths
+    // 29 subjects from the list + the fixture's maths; 14 classes per form × 3 + the fixture's 2 classes.
+    expect(first).toEqual({ subjects: 30, programmes: 6, classes: 44, houses: 4 });
     expect(again).toEqual(first);
     const combos = await db.select().from(schema.subjectCombinations);
     expect(combos).toHaveLength(7 + 7 + 5 + 5 + 10 + 4);
     expect(combos.filter((c) => c.mustDropOne)).toHaveLength(3);
   });
 
-  it('creates classes named like the combination list and gives them the subjects their options need', async () => {
+  it('creates Arts 1–4, Bus 1–2, H/Econs 1–3, Lang 1–2, Science 1 and Visual 1–2 for every form, named like the combination list', async () => {
+    const names = (await http().get('/api/v1/classes').set(bearer(head)).expect(200)).body.map((c: { name: string }) => c.name);
+    for (const form of [1, 2, 3]) {
+      expect(names).toEqual(
+        expect.arrayContaining([
+          `${form}G/A 1`,
+          `${form}G/A 4`,
+          `${form}BUS 2`,
+          `${form}H/E 3`,
+          `${form} LANG 1`,
+          `${form} LANG 2`,
+          `${form}G/S 1`,
+          `${form}VIS 2`,
+        ]),
+      );
+      expect(names).not.toContain(`${form}G/A 5`);
+      expect(names).not.toContain(`${form}G/S 2`);
+    }
+    // Adding a class later still works and follows the same naming.
     const bus = await programme('BUS');
-    const res = await http().post('/api/v1/classes/bulk').set(bearer(head)).send({ programmeId: bus.id, forms: [1], streams: 2 }).expect(201);
-    expect(res.body.created).toEqual(['1BUS 1', '1BUS 2']);
+    const res = await http().post('/api/v1/classes/bulk').set(bearer(head)).send({ programmeId: bus.id, forms: [1], streams: 3 }).expect(201);
+    expect(res.body).toEqual({ created: ['1BUS 3'], skipped: 2 });
+    const lang = await programme('LANG');
+    const more = await http().post('/api/v1/classes/bulk').set(bearer(head)).send({ programmeId: lang.id, forms: [1], streams: 3 }).expect(201);
+    expect(more.body.created).toEqual(['1 LANG 3']);
     [bus1] = await db.select().from(schema.classes).where(eq(schema.classes.name, '1BUS 1'));
 
     const subjects = await http().get(`/api/v1/classes/${bus1.id}/subjects`).set(bearer(head)).expect(200);
-    const names = subjects.body.map((s: { name: string }) => s.name).sort();
+    const subjectNames = subjects.body.map((s: { name: string }) => s.name).sort();
     // 5 core + options 1A/1B electives (Business Management, Accounting, Economics, ICT, Art & Design Studio, French)
-    expect(names).toEqual(
+    expect(subjectNames).toEqual(
       [
         'Accounting',
         'Art & Design Studio',
@@ -111,7 +134,7 @@ describe('options, houses and semester assessment', () => {
 
     // Science students don't take General Science as a core subject.
     const gs = await programme('G/S');
-    const [sci] = await db.insert(schema.classes).values({ name: '1G/S 1', form: 1, stream: 1, programmeId: gs.id }).returning();
+    const [sci] = await db.select().from(schema.classes).where(eq(schema.classes.name, '1G/S 1'));
     const opt = await option(gs.id, 2);
     await http()
       .post('/api/v1/users')
@@ -195,10 +218,45 @@ describe('options, houses and semester assessment', () => {
     expect((await slot('FREN')).status).toBe(201);
     expect((await slot('ADS')).status).toBe(201); // 1BUS 1A has Art & Design Studio while 1BUS 1B has French
     expect((await slot('ENG', '10:30', '11:30')).status).toBe(409);
-    expect((await slot('ECON')).status).toBe(409); // both groups take Economics
+    // Both groups take Economics: allowed (the school decides) but flagged.
+    const econ = await slot('ECON');
+    expect(econ.status).toBe(201);
+    expect(econ.body.warnings).toEqual(['Option 1 (1BUS 1A) takes both subjects in this period', 'Option 2 (1BUS 1B) takes both subjects in this period']);
+    await http().delete(`/api/v1/timetable/${econ.body.id}`).set(bearer(head)).expect(204);
+
+    // Friday 09:30–11:30 is PLC / VLC.
+    const plc = await http()
+      .post('/api/v1/timetable')
+      .set(bearer(head))
+      .send({ termId: seed.term.id, classId: bus1.id, subjectId: await subjectId('ICT'), dayOfWeek: 5, startsAt: '10:30', endsAt: '11:30' });
+    expect(plc.status).toBe(409);
+    expect(plc.body.message).toMatch(/PLC \/ VLC/);
 
     const artWeek = await http().get('/api/v1/timetable/mine').set(bearer(studentArt)).expect(200);
     expect(artWeek.body.map((s: { subjectName: string }) => s.subjectName)).toEqual(['Art & Design Studio']);
+  });
+
+  it('loads the provisional 1SC and 1HE2 timetables, splits included', async () => {
+    const report = await loadSampleTimetables(db, seed.term.id);
+    expect(report).toEqual({ '1G/S 1': '49 lessons added', '1H/E 2': '49 lessons added' });
+    expect(await loadSampleTimetables(db, seed.term.id)).toEqual({
+      '1G/S 1': 'already has a timetable for this semester; left unchanged',
+      '1H/E 2': 'already has a timetable for this semester; left unchanged',
+    });
+
+    const [he2] = await db.select().from(schema.classes).where(eq(schema.classes.name, '1H/E 2'));
+    const week = (await http().get(`/api/v1/timetable/class/${he2.id}?termId=${seed.term.id}`).set(bearer(head)).expect(200)).body as {
+      dayOfWeek: number;
+      startsAt: string;
+      subjectName: string;
+    }[];
+    const wedP7 = week.filter((s) => s.dayOfWeek === 3 && s.startsAt === '14:00').map((s) => s.subjectName).sort();
+    expect(wedP7).toEqual(['Art & Design Foundation', 'French']);
+    // Each subject has 4 periods a week; core PEH has 1.
+    const count = (n: string) => week.filter((s) => s.subjectName === n).length;
+    expect(count('Clothing & Textiles')).toBe(4);
+    expect(count('ICT')).toBe(4);
+    expect(count('Physical Education & Health')).toBe(1);
   });
 
   it('houses: leadership awards points; house notices reach that house only', async () => {

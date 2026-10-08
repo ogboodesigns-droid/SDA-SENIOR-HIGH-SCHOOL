@@ -1,8 +1,8 @@
 import { Body, ConflictException, Controller, Delete, Get, HttpCode, Module, NotFoundException, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { and, asc, eq, gt, inArray, lt, ne, type SQL } from 'drizzle-orm';
-import { timetableEntrySchema, type TimetableEntryInput, type TimetableSlot } from '@sda-shs/shared';
+import { activityAt, DEFAULT_BELL_SCHEDULE, timetableEntrySchema, type TimetableEntryInput, type TimetableSlot } from '@sda-shs/shared';
 import { InjectDb, type Database } from '../database/database.module';
-import { classes, classSubjects, subjects, terms, timetableEntries, users } from '../database/schema';
+import { classes, classSubjects, schoolProfile, subjects, terms, timetableEntries, users } from '../database/schema';
 import type { AuthUser } from '../common/auth-user';
 import { CurrentUser, RequirePermissions } from '../common/decorators';
 import { ZodPipe } from '../common/zod.pipe';
@@ -87,6 +87,10 @@ export class TimetableController {
       .where(and(eq(classSubjects.classId, body.classId), eq(classSubjects.subjectId, body.subjectId)));
     if (!assigned) throw new NotFoundException('Add this subject to the class before timetabling it');
 
+    const [profile] = await this.db.select({ b: schoolProfile.bellSchedule }).from(schoolProfile).where(eq(schoolProfile.id, 1));
+    const activity = activityAt(profile?.b ?? DEFAULT_BELL_SCHEDULE, body.dayOfWeek, body.startsAt, body.endsAt);
+    if (activity) throw new ConflictException(`${activity.label} takes place at this time (${activity.startsAt}–${activity.endsAt})`);
+
     const overlaps = and(
       eq(timetableEntries.termId, body.termId),
       eq(timetableEntries.dayOfWeek, body.dayOfWeek),
@@ -94,13 +98,16 @@ export class TimetableController {
       gt(timetableEntries.endsAt, body.startsAt),
     );
     const sameTime = await this.db
-      .select({ subjectId: timetableEntries.subjectId })
+      .select({ subjectId: timetableEntries.subjectId, subjectName: subjects.name })
       .from(timetableEntries)
+      .innerJoin(subjects, eq(subjects.id, timetableEntries.subjectId))
       .where(and(overlaps, eq(timetableEntries.classId, body.classId)));
+    // A split period (e.g. GEOGRAPHY / COMPUTING) is allowed for electives; warn when some option takes both.
+    const warnings: string[] = [];
     for (const other of sameTime) {
-      if (!(await this.curriculum.canRunTogether(body.classId, body.subjectId, other.subjectId))) {
-        throw new ConflictException('The class already has a lesson at this time');
-      }
+      const check = await this.curriculum.splitCheck(body.classId, body.subjectId, other.subjectId);
+      if (!check.allowed) throw new ConflictException(`The class already has ${other.subjectName} at this time`);
+      for (const o of check.clashingOptions) warnings.push(`${o} takes both subjects in this period`);
     }
 
     if (assigned.teacherId) {
@@ -111,11 +118,12 @@ export class TimetableController {
         .innerJoin(classes, eq(classes.id, timetableEntries.classId))
         .where(and(overlaps, eq(classSubjects.teacherId, assigned.teacherId), ne(timetableEntries.classId, body.classId)))
         .limit(1);
-      if (teacherClash) throw new ConflictException(`The teacher is already teaching ${teacherClash.className} at this time`);
+      // Combined lessons (e.g. French for two classes together) are real, so this only warns.
+      if (teacherClash) warnings.push(`The teacher is also timetabled with ${teacherClash.className} at this time (combined lesson?)`);
     }
 
     const [row] = await this.db.insert(timetableEntries).values({ ...body, room: body.room ?? null }).returning({ id: timetableEntries.id });
-    return row;
+    return { ...row, warnings: [...new Set(warnings)].sort() };
   }
 
   @RequirePermissions('timetable:manage')

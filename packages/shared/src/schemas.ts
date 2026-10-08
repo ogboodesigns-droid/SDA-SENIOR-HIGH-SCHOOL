@@ -188,6 +188,8 @@ const programmeCode = z
 export const programmeSchema = z.object({
   name: trimmed(80),
   code: programmeCode,
+  /** Write class names with a space after the form: "1 LANG 1" instead of "1LANG 1". */
+  spacedName: z.boolean().default(false),
   /** What people call the classes, e.g. "Arts" for "Arts 1", "Arts 2". */
   label: z.string().trim().max(20).nullish(),
 });
@@ -203,8 +205,8 @@ export const bulkClassesSchema = z.object({
 });
 export type BulkClassesInput = z.infer<typeof bulkClassesSchema>;
 
-export function className(form: number, programmeCode: string, stream: number) {
-  return `${form}${programmeCode} ${stream}`;
+export function className(form: number, programmeCode: string, stream: number, spaced = false) {
+  return `${form}${spaced ? ' ' : ''}${programmeCode} ${stream}`;
 }
 
 /**
@@ -278,6 +280,32 @@ export const timetableEntrySchema = z
   })
   .refine((v) => v.startsAt < v.endsAt, 'The period must end after it starts');
 export type TimetableEntryInput = z.infer<typeof timetableEntrySchema>;
+
+const bellPeriodSchema = z
+  .object({
+    key: z.string().trim().regex(/^[A-Za-z0-9_]{1,16}$/),
+    label: trimmed(40),
+    startsAt: timeOfDay,
+    endsAt: timeOfDay,
+    kind: z.enum(['lesson', 'break']),
+  })
+  .refine((p) => p.startsAt < p.endsAt, 'A period must end after it starts');
+
+export const bellScheduleSchema = z.object({
+  days: z.array(z.number().int().min(1).max(7)).min(1).max(7),
+  periods: z
+    .array(bellPeriodSchema)
+    .min(1)
+    .max(20)
+    .refine((ps) => ps.every((p, i) => i === 0 || ps[i - 1].endsAt <= p.startsAt), 'Periods must be in order and must not overlap'),
+  activities: z
+    .array(
+      z
+        .object({ day: z.number().int().min(1).max(7), label: trimmed(40), startsAt: timeOfDay, endsAt: timeOfDay })
+        .refine((a) => a.startsAt < a.endsAt, 'An activity must end after it starts'),
+    )
+    .max(30),
+});
 
 // ── Announcements & events ──────────────────────────────────────────────────
 

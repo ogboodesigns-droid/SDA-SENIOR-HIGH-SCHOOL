@@ -181,7 +181,7 @@ export class AcademicsController {
     if (!programme.code) throw new BadRequestException('Give this programme a code (e.g. BUS) first');
     const values = body.forms.flatMap((form) =>
       Array.from({ length: body.streams }, (_, i) => ({
-        name: className(form, programme.code!, i + 1),
+        name: className(form, programme.code!, i + 1, programme.spacedName),
         form,
         stream: i + 1,
         programmeId: programme.id,

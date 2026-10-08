@@ -96,3 +96,13 @@ td input { min-width: 70px; }
   .sidebar .spacer, .sidebar .brand-sub { display: none; }
   main { padding: 18px 16px; }
 }
+
+/* Timetable grid, laid out like the school's printed master timetables */
+.timetable th, .timetable td { border: 1px solid var(--border); text-align: center; min-width: 120px; }
+.timetable td:first-child, .timetable th:first-child { text-align: left; min-width: 150px; }
+.timetable .tt-break td { background: #f3f4f7; color: var(--muted); font-style: italic; padding: 4px 10px; }
+.timetable .tt-activity { background: #f8e6f0; color: var(--brand); font-weight: 600; }
+.tt-subject { font-weight: 700; text-transform: uppercase; font-size: .82rem; }
+.tt-lesson .muted { font-size: .8rem; margin: 2px 0 0; }
+.tt-remove { background: none; border: none; color: var(--muted); padding: 0 3px; font-weight: 400; cursor: pointer; }
+.tt-remove:hover { color: var(--danger); }

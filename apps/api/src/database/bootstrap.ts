@@ -1,7 +1,7 @@
 /**
  * One-time setup for a fresh installation:
  *   - creates the school profile with the school's official details
- *   - loads the subjects, learning areas (with their options) and houses
+ *   - loads the subjects, learning areas (with their options), classes and houses
  *   - creates the first Super Administrator account
  *
  * It deliberately creates no students, staff or other sample data:
@@ -15,7 +15,7 @@ import { hash } from 'argon2';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { eq } from 'drizzle-orm';
 import { Pool } from 'pg';
-import { DEFAULT_ASSESSMENT_SCHEMES, DEFAULT_GRADING_SCALE, passwordSchema } from '@sda-shs/shared';
+import { DEFAULT_ASSESSMENT_SCHEMES, DEFAULT_BELL_SCHEDULE, DEFAULT_GRADING_SCALE, passwordSchema } from '@sda-shs/shared';
 import { loadSchoolCatalogue } from './school-catalogue';
 import * as schema from './schema';
 
@@ -47,11 +47,12 @@ async function main() {
         address: process.env.SCHOOL_ADDRESS?.trim() || SCHOOL.address,
         gradingScale: { bands: DEFAULT_GRADING_SCALE },
         assessmentSchemes: DEFAULT_ASSESSMENT_SCHEMES,
+        bellSchedule: DEFAULT_BELL_SCHEDULE,
       })
       .onConflictDoNothing();
 
     const counts = await loadSchoolCatalogue(db);
-    console.log(`School catalogue: ${counts.subjects} subjects, ${counts.programmes} learning areas, ${counts.houses} houses.`);
+    console.log(`School catalogue: ${counts.subjects} subjects, ${counts.programmes} learning areas, ${counts.classes} classes, ${counts.houses} houses.`);
 
     const existing = await db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.role, 'super_admin')).limit(1);
     if (existing.length) {
