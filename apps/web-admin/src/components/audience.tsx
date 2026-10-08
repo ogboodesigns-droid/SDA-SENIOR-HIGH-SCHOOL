@@ -12,8 +12,16 @@ export function AudienceFields({ schoolWide }: { schoolWide: boolean }) {
   const [type, setType] = useState<AudienceType>(schoolWide ? 'school' : 'class');
   const classes = useApi<ClassRow[]>('/classes');
   const programmes = useApi<{ id: string; name: string }[]>(schoolWide ? '/programmes' : null);
-  const types: AudienceType[] = schoolWide ? ['school', 'role', 'form', 'programme', 'class'] : ['class'];
-  const labels: Record<AudienceType, string> = { school: 'Whole school', role: 'A group of users', form: 'A form (year group)', programme: 'A programme', class: 'A class' };
+  const houses = useApi<{ id: string; name: string }[]>(schoolWide ? '/houses' : null);
+  const types: AudienceType[] = schoolWide ? ['school', 'role', 'form', 'programme', 'class', 'house'] : ['class'];
+  const labels: Record<AudienceType, string> = {
+    school: 'Whole school',
+    role: 'A group of users',
+    form: 'A form (year group)',
+    programme: 'A learning area',
+    class: 'A class',
+    house: 'A house',
+  };
 
   return (
     <>
@@ -47,11 +55,22 @@ export function AudienceFields({ schoolWide }: { schoolWide: boolean }) {
         </Field>
       )}
       {type === 'programme' && (
-        <Field label="Programme">
+        <Field label="Learning area">
           <select name="audienceRef">
             {programmes.data?.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+      )}
+      {type === 'house' && (
+        <Field label="House">
+          <select name="audienceRef" required>
+            {houses.data?.map((h) => (
+              <option key={h.id} value={h.id}>
+                {h.name}
               </option>
             ))}
           </select>

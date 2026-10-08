@@ -1,12 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import type { Paginated, SubjectWithTeacher, TermSummary, UserListItem } from '@sda-shs/shared';
+import type { Paginated, SubjectCombination, SubjectWithTeacher, TermSummary, UserListItem } from '@sda-shs/shared';
 import { api, errorMessage, formatDate, useApi } from '@/lib/api';
 import { Alert, blankToNull, Card, Empty, Field, Loading, PageHeader, useSubmit } from '@/components/ui';
 
 interface Year { id: string; name: string; startsOn: string; endsOn: string }
-interface Programme { id: string; name: string; code: string | null }
+interface Programme { id: string; name: string; code: string | null; label: string | null }
 interface ClassRow { id: string; name: string; form: number; programmeId: string; programmeName: string; formMasterId: string | null; formMasterName: string | null }
 interface Subject { id: string; code: string; name: string; isCore: boolean }
 
@@ -23,13 +23,17 @@ function TermsCard() {
     await years.reload();
   });
   const addTerm = useSubmit(async (v, form) => {
-    await api('/terms', { method: 'POST', body: { ...v, isCurrent: v.isCurrent === 'on' } });
+    const semester = Number(v.semester) as 1 | 2;
+    await api('/terms', {
+      method: 'POST',
+      body: { ...v, semester, name: semester === 1 ? 'First Semester' : 'Second Semester', isCurrent: v.isCurrent === 'on' },
+    });
     form.reset();
     await terms.reload();
   });
 
   return (
-    <Card title="Academic years & terms">
+    <Card title="Academic years & semesters">
       <form className="row" onSubmit={addYear.onSubmit}>
         <input name="name" placeholder="2026/2027" required style={{ maxWidth: 140 }} aria-label="Year name" />
         <input name="startsOn" type="date" required style={{ maxWidth: 170 }} aria-label="Starts" />
@@ -46,13 +50,16 @@ function TermsCard() {
             </option>
           ))}
         </select>
-        <input name="name" placeholder="First Semester" required style={{ maxWidth: 180 }} aria-label="Term name" />
+        <select name="semester" style={{ maxWidth: 180 }} aria-label="Semester">
+          <option value="1">First Semester</option>
+          <option value="2">Second Semester</option>
+        </select>
         <input name="startsOn" type="date" required style={{ maxWidth: 170 }} aria-label="Starts" />
         <input name="endsOn" type="date" required style={{ maxWidth: 170 }} aria-label="Ends" />
         <label className="row">
           <input type="checkbox" name="isCurrent" /> Current
         </label>
-        <button disabled={addTerm.busy}>Add term</button>
+        <button disabled={addTerm.busy}>Add semester</button>
       </form>
       <Alert>{addTerm.error}</Alert>
 
@@ -80,51 +87,38 @@ function TermsCard() {
           </tbody>
         </table>
       ) : (
-        <Empty>No terms yet.</Empty>
+        <Empty>No semesters yet.</Empty>
       )}
     </Card>
   );
 }
-
-/**
- * The school's programmes and how many streams each form has. Codes and
- * stream counts are starting suggestions only: Science and Business use SCI
- * and BUS (as in "1 SCI 1"); check the others and fill in any blanks.
- */
-const SUGGESTED_PROGRAMMES = [
-  { name: 'Science', code: 'SCI', streams: '' },
-  { name: 'Business', code: 'BUS', streams: '' },
-  { name: 'Home Economics', code: 'HE', streams: '3' },
-  { name: 'Visual Arts', code: 'VA', streams: '2' },
-  { name: 'Languages', code: 'LANG', streams: '' },
-  { name: 'General Arts', code: 'GA', streams: '6' },
-];
 
 function ProgrammeRow({
   initial,
   existing,
   onDone,
 }: {
-  initial: { name: string; code: string; streams: string };
+  initial: { name: string; code: string; label: string; streams: string };
   existing?: Programme;
   onDone: () => void;
 }) {
   const [name, setName] = useState(existing?.name ?? initial.name);
   const [code, setCode] = useState(existing?.code ?? initial.code);
+  const [label, setLabel] = useState(existing?.label ?? initial.label);
   const [streams, setStreams] = useState(initial.streams);
   const [forms, setForms] = useState([1, 2, 3]);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<{ kind: 'error' | 'success'; text: string } | null>(null);
-  const preview = code && streams ? `${forms[0] ?? 1} ${code.toUpperCase()} 1 … ${forms[forms.length - 1] ?? 3} ${code.toUpperCase()} ${streams}` : '';
+  const preview = code && streams ? `${forms[0] ?? 1}${code.toUpperCase()} 1 … ${forms[forms.length - 1] ?? 3}${code.toUpperCase()} ${streams}` : '';
 
   async function create() {
     setBusy(true);
     setNote(null);
     try {
       let programme = existing;
-      if (!programme) programme = await api<Programme>('/programmes', { method: 'POST', body: { name, code } });
-      else if (programme.code !== code.toUpperCase() || programme.name !== name) {
-        programme = await api<Programme>(`/programmes/${programme.id}`, { method: 'PATCH', body: { name, code } });
+      if (!programme) programme = await api<Programme>('/programmes', { method: 'POST', body: { name, code, label: label || null } });
+      else if (programme.code !== code.toUpperCase() || programme.name !== name || (programme.label ?? '') !== label) {
+        programme = await api<Programme>(`/programmes/${programme.id}`, { method: 'PATCH', body: { name, code, label: label || null } });
       }
       const res = await api<{ created: string[]; skipped: number }>('/classes/bulk', {
         method: 'POST',
@@ -150,7 +144,10 @@ function ProgrammeRow({
         <input value={name} onChange={(e) => setName(e.target.value)} aria-label="Programme name" />
       </td>
       <td>
-        <input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} maxLength={6} style={{ maxWidth: 90 }} aria-label={`Code for ${name}`} />
+        <input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} maxLength={6} style={{ maxWidth: 80 }} aria-label={`Code for ${name}`} />
+      </td>
+      <td>
+        <input value={label} onChange={(e) => setLabel(e.target.value)} maxLength={20} style={{ maxWidth: 110 }} aria-label={`Class label for ${name}`} />
       </td>
       <td>
         <input type="number" min={1} max={20} value={streams} onChange={(e) => setStreams(e.target.value)} style={{ maxWidth: 80 }} aria-label={`Classes per form for ${name}`} />
@@ -182,46 +179,166 @@ function ProgrammeRow({
 
 function ProgrammesCard({ onChange }: { onChange: () => void }) {
   const programmes = useApi<Programme[]>('/programmes');
+  const combos = useApi<SubjectCombination[]>('/combinations');
   const [extra, setExtra] = useState(0);
-  if (!programmes.data) return <Card title="Programmes & class sets"><Loading /></Card>;
-
-  const known = new Map(programmes.data.map((p) => [p.name.toLowerCase(), p]));
-  const suggestedNames = new Set(SUGGESTED_PROGRAMMES.map((p) => p.name.toLowerCase()));
-  const others = programmes.data.filter((p) => !suggestedNames.has(p.name.toLowerCase()));
+  if (!programmes.data || !combos.data) {
+    return (
+      <Card title="Learning areas & classes">
+        <Loading />
+      </Card>
+    );
+  }
+  // Suggest as many classes per form as the subject combination list has class numbers.
+  const streamsFor = (programmeId: string) => {
+    const max = Math.max(0, ...combos.data!.filter((c) => c.programmeId === programmeId).map((c) => c.stream));
+    return max ? String(max) : '';
+  };
+  const done = () => (programmes.reload(), onChange());
 
   return (
-    <Card title="Programmes & class sets">
+    <Card title="Learning areas & classes">
       <p className="muted" style={{ marginTop: 0 }}>
-        Classes are named <strong>form, programme code, class number</strong>: 1 SCI 1, 1 SCI 2 … 3 SCI 2. Enter how many classes each form has and
-        create them all at once. Running it again only adds classes that are missing, so you can increase the number later.
+        Classes are named <strong>form, code, class number</strong> as on the subject combination list: 1BUS 1, 2G/A 3, 3VIS 2. The option letter
+        (the A in 1BUS 1A) comes from each student&apos;s option. Classes per form starts from the number of classes on the combination list; change
+        it and tick the forms to create a different number for SHS 2 and 3. Running it again only adds missing classes.
       </p>
       <div className="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>Programme</th>
+              <th>Learning area</th>
               <th>Code</th>
+              <th>Label</th>
               <th>Classes per form</th>
               <th>Forms</th>
               <th />
             </tr>
           </thead>
           <tbody>
-            {SUGGESTED_PROGRAMMES.map((p) => (
-              <ProgrammeRow key={p.name} initial={p} existing={known.get(p.name.toLowerCase())} onDone={() => (programmes.reload(), onChange())} />
-            ))}
-            {others.map((p) => (
-              <ProgrammeRow key={p.id} initial={{ name: p.name, code: p.code ?? '', streams: '' }} existing={p} onDone={() => (programmes.reload(), onChange())} />
+            {programmes.data.map((p) => (
+              <ProgrammeRow key={p.id} initial={{ name: p.name, code: p.code ?? '', label: p.label ?? '', streams: streamsFor(p.id) }} existing={p} onDone={done} />
             ))}
             {Array.from({ length: extra }, (_, i) => (
-              <ProgrammeRow key={`new-${i}`} initial={{ name: '', code: '', streams: '' }} onDone={() => (programmes.reload(), onChange())} />
+              <ProgrammeRow key={`new-${i}`} initial={{ name: '', code: '', label: '', streams: '' }} onDone={done} />
             ))}
           </tbody>
         </table>
       </div>
       <button className="secondary" onClick={() => setExtra(extra + 1)} style={{ marginTop: 10 }}>
-        Add another programme
+        Add another learning area
       </button>
+    </Card>
+  );
+}
+
+/** The options from the subject combination list, per learning area. */
+function OptionsCard() {
+  const programmes = useApi<Programme[]>('/programmes');
+  const subjects = useApi<Subject[]>('/subjects');
+  const [programmeId, setProgrammeId] = useState('');
+  const combos = useApi<SubjectCombination[]>(programmeId ? `/combinations?programmeId=${programmeId}` : null);
+  const [picked, setPicked] = useState<string[]>([]);
+  const programme = programmes.data?.find((p) => p.id === programmeId);
+
+  const add = useSubmit(async (v, form) => {
+    await api('/combinations', {
+      method: 'POST',
+      body: {
+        programmeId,
+        option: Number(v.option),
+        stream: Number(v.stream),
+        letter: v.letter ?? '',
+        electiveSubjectIds: picked,
+        mustDropOne: v.mustDropOne === 'on',
+      },
+    });
+    form.reset();
+    setPicked([]);
+    await combos.reload();
+    return 'Option added. Use “Fill from options” on the classes to add any new subjects.';
+  });
+
+  return (
+    <Card title="Subject combinations (options)">
+      <Field label="Learning area">
+        <select value={programmeId} onChange={(e) => setProgrammeId(e.target.value)} style={{ maxWidth: 280 }}>
+          <option value="">Choose a learning area</option>
+          {programmes.data?.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+      </Field>
+      {programmeId && (
+        <>
+          {!combos.data?.length ? (
+            <Empty>No options yet.</Empty>
+          ) : (
+            <table style={{ marginTop: 12 }}>
+              <thead>
+                <tr>
+                  <th>Option</th>
+                  <th>Class</th>
+                  <th>Elective subjects</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {combos.data.map((c) => (
+                  <tr key={c.id}>
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      Option {c.option}
+                      {c.mustDropOne && <span title="Must drop one subject before SHS 3"> *</span>}
+                    </td>
+                    <td style={{ whiteSpace: 'nowrap' }}>{`1${programme?.code ?? ''} ${c.stream}${c.letter}`}</td>
+                    <td>{c.electives.map((e) => e.name).join(', ')}</td>
+                    <td>
+                      <button
+                        className="secondary"
+                        onClick={() => confirm(`Remove option ${c.option}? Students on it keep their class.`) && api(`/combinations/${c.id}`, { method: 'DELETE' }).then(combos.reload)}
+                      >
+                        Remove
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {combos.data?.some((c) => c.mustDropOne) && <p className="field-hint">* Students on this option must drop one subject before SHS 3.</p>}
+
+          <form className="stack" onSubmit={add.onSubmit} style={{ marginTop: 14 }}>
+            <div className="row">
+              <input name="option" type="number" min={1} placeholder="Option no." required style={{ maxWidth: 120 }} aria-label="Option number" />
+              <input name="stream" type="number" min={1} placeholder="Class no." required style={{ maxWidth: 120 }} aria-label="Class number" />
+              <input name="letter" placeholder="Letter (A, B…)" maxLength={2} style={{ maxWidth: 130 }} aria-label="Letter" />
+              <label className="row" style={{ gap: 4 }}>
+                <input type="checkbox" name="mustDropOne" /> Must drop one before SHS 3
+              </label>
+            </div>
+            <div className="row" style={{ gap: 14 }}>
+              {subjects.data
+                ?.filter((s) => !s.isCore)
+                .map((s) => (
+                  <label key={s.id} className="row" style={{ gap: 4 }}>
+                    <input
+                      type="checkbox"
+                      checked={picked.includes(s.id)}
+                      onChange={(e) => setPicked(e.target.checked ? [...picked, s.id] : picked.filter((x) => x !== s.id))}
+                    />
+                    {s.name}
+                  </label>
+                ))}
+            </div>
+            <Alert>{add.error}</Alert>
+            <Alert kind="success">{add.success}</Alert>
+            <div>
+              <button disabled={add.busy || !picked.length}>Add option</button>
+            </div>
+          </form>
+        </>
+      )}
     </Card>
   );
 }
@@ -241,7 +358,7 @@ function ClassesCard({ version, onChange }: { version: number; onChange: () => v
     <Card title={`Classes (${classes.data?.length ?? 0})`}>
       <p className="muted" style={{ marginTop: 0 }}>Add a single class, e.g. a new stream created mid-year.</p>
       <form className="row" onSubmit={addClass.onSubmit}>
-        <input name="name" placeholder="Class name, e.g. 1 SCI 3" required style={{ maxWidth: 200 }} aria-label="Class name" />
+        <input name="name" placeholder="Class name, e.g. 1BUS 3" required style={{ maxWidth: 200 }} aria-label="Class name" />
         <select name="form" required style={{ maxWidth: 110 }} aria-label="Form">
           <option value="1">SHS 1</option>
           <option value="2">SHS 2</option>
@@ -337,6 +454,7 @@ function ClassSubjectsCard({ version }: { version: number }) {
   const subjects = useApi<Subject[]>('/subjects');
   const teachers = useTeachers();
   const [classId, setClassId] = useState('');
+  const [note, setNote] = useState<string | null>(null);
   const assigned = useApi<SubjectWithTeacher[]>(classId ? `/classes/${classId}/subjects` : null);
   const add = useSubmit(async (v) => {
     await api('/class-subjects', { method: 'PUT', body: { classId, subjectId: v.subjectId, teacherId: blankToNull(v.teacherId) } });
@@ -344,9 +462,9 @@ function ClassSubjectsCard({ version }: { version: number }) {
   });
 
   return (
-    <Card title="Subjects taught in each class">
+    <Card title="Subjects and teachers for each class">
       <Field label="Class">
-        <select value={classId} onChange={(e) => setClassId(e.target.value)} style={{ maxWidth: 260 }}>
+        <select value={classId} onChange={(e) => (setClassId(e.target.value), setNote(null))} style={{ maxWidth: 260 }}>
           <option value="">Choose a class</option>
           {classes.data?.map((c) => (
             <option key={c.id} value={c.id}>
@@ -357,12 +475,43 @@ function ClassSubjectsCard({ version }: { version: number }) {
       </Field>
       {classId && (
         <>
+          <div className="row" style={{ marginTop: 12 }}>
+            <button
+              className="secondary"
+              onClick={() =>
+                api<{ added: number }>(`/classes/${classId}/sync-subjects`, { method: 'POST' }).then((r) => {
+                  setNote(r.added ? `Added ${r.added} subject(s) from the class's options.` : 'The class already has every subject its options need.');
+                  return assigned.reload();
+                })
+              }
+            >
+              Fill from options
+            </button>
+            {note && <span className="muted">{note}</span>}
+          </div>
           <table style={{ marginTop: 12 }}>
             <tbody>
               {assigned.data?.map((s) => (
                 <tr key={s.classSubjectId}>
-                  <td>{s.name}</td>
-                  <td>{s.teacherName ?? <span className="badge warn">No teacher</span>}</td>
+                  <td>
+                    {s.name} {s.isCore && <span className="badge">core</span>}
+                  </td>
+                  <td>
+                    <select
+                      value={s.teacherId ?? ''}
+                      aria-label={`Teacher for ${s.name}`}
+                      onChange={(e) =>
+                        api('/class-subjects', { method: 'PUT', body: { classId, subjectId: s.subjectId, teacherId: e.target.value || null } }).then(assigned.reload)
+                      }
+                    >
+                      <option value="">— No teacher yet —</option>
+                      {teachers.data?.items.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.fullName}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
                   <td>
                     <button className="secondary" onClick={() => api(`/class-subjects/${s.classSubjectId}`, { method: 'DELETE' }).then(assigned.reload)}>
                       Remove
@@ -390,7 +539,7 @@ function ClassSubjectsCard({ version }: { version: number }) {
             </select>
             <button disabled={add.busy}>Assign</button>
           </form>
-          <p className="field-hint">Assigning a subject that is already on the class changes its teacher.</p>
+          <p className="field-hint">Add a subject that isn&apos;t on the list, e.g. a new option.</p>
           <Alert>{add.error}</Alert>
         </>
       )}
@@ -406,6 +555,7 @@ export default function AcademicsPage() {
       <TermsCard />
       <ProgrammesCard onChange={() => setVersion((v) => v + 1)} />
       <ClassesCard version={version} onChange={() => setVersion((v) => v + 1)} />
+      <OptionsCard />
       <SubjectsCard />
       <ClassSubjectsCard version={version} />
     </>

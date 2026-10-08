@@ -1,7 +1,7 @@
 'use client';
 
 import { use, useState } from 'react';
-import { ROLE_LABELS, type Me, type Paginated, type UserListItem } from '@sda-shs/shared';
+import { ROLE_LABELS, type House, type Me, type Paginated, type SubjectCombination, type UserListItem } from '@sda-shs/shared';
 import { api, formatDate, useApi } from '@/lib/api';
 import { useCan } from '@/lib/me';
 import { Alert, Card, Field, Loading, PageHeader, useSubmit } from '@/components/ui';
@@ -17,7 +17,12 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
   const { id } = use(params);
   const canManage = useCan('users:manage');
   const user = useApi<UserDetail>(`/users/${id}`);
-  const classes = useApi<{ id: string; name: string }[]>(user.data?.role === 'student' ? '/classes' : null);
+  const classes = useApi<{ id: string; name: string; programmeId: string; stream: number | null }[]>(user.data?.role === 'student' ? '/classes' : null);
+  const houses = useApi<House[]>(user.data?.role === 'student' ? '/houses' : null);
+  const cls = classes.data?.find((c) => c.id === user.data?.student?.classId);
+  const combos = useApi<SubjectCombination[]>(cls ? `/combinations?programmeId=${cls.programmeId}` : null);
+  const options = combos.data?.filter((c) => cls?.stream == null || c.stream === cls.stream) ?? [];
+  const [optionId, setOptionId] = useState<string | null>(null);
   const [parentSearch, setParentSearch] = useState('');
   const parents = useApi<Paginated<UserListItem>>(
     canManage && user.data?.role === 'student' && parentSearch.length > 1 ? `/users?role=parent&search=${encodeURIComponent(parentSearch)}` : null,
@@ -99,7 +104,11 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
               </div>
               <div>
                 <div className="field-label">Class</div>
-                {u.student.className} ({u.student.programmeName})
+                {u.student.groupName} ({u.student.programmeName})
+              </div>
+              <div>
+                <div className="field-label">House</div>
+                {u.student.houseName ?? '—'}
               </div>
             </>
           )}
@@ -114,6 +123,35 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                 {classes.data?.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Option (subject combination)">
+              <select
+                value={optionId ?? u.student.combinationId ?? ''}
+                onChange={(e) => {
+                  setOptionId(e.target.value);
+                  void act(() => api(`/users/${id}`, { method: 'PATCH', body: { combinationId: e.target.value || null } }), 'Option updated.');
+                }}
+              >
+                <option value="">Not chosen</option>
+                {options.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {`${u.student!.className}${o.letter}`} · Option {o.option}: {o.electives.map((e) => e.name).join(', ')}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="House">
+              <select
+                defaultValue={u.student.houseId ?? ''}
+                onChange={(e) => act(() => api(`/users/${id}`, { method: 'PATCH', body: { houseId: e.target.value || null } }), 'House updated.')}
+              >
+                <option value="">Not assigned</option>
+                {houses.data?.map((h) => (
+                  <option key={h.id} value={h.id}>
+                    {h.name}
                   </option>
                 ))}
               </select>

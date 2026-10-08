@@ -17,6 +17,7 @@ const QUICK: { label: string; icon: keyof typeof Ionicons.glyphMap; href: Href; 
   { label: 'News', icon: 'megaphone-outline', href: '/updates' },
   { label: 'Events', icon: 'calendar-outline', href: '/calendar' },
   { label: 'Faith Life', icon: 'heart-outline', href: '/faith' },
+  { label: 'Houses', icon: 'trophy-outline', href: '/houses' },
   { label: 'Our School', icon: 'school-outline', href: '/school' },
 ];
 
@@ -55,8 +56,13 @@ export default function HomeScreen() {
         <Text style={s.greeting}>
           {greeting()}, {me?.fullName.split(' ')[0]} 👋
         </Text>
-        {me?.role === 'parent' && child && <Text style={s.heroSub}>Viewing {child.fullName} · {child.className}</Text>}
-        {me?.role === 'student' && me.student && <Text style={s.heroSub}>{me.student.className}</Text>}
+        {me?.role === 'parent' && child && <Text style={s.heroSub}>Viewing {child.fullName} · {child.groupName}</Text>}
+        {me?.role === 'student' && me.student && (
+          <Text style={s.heroSub}>
+            {me.student.groupName}
+            {me.student.houseName ? ` · ${me.student.houseName} House` : ''}
+          </Text>
+        )}
         <Pressable onPress={() => router.push('/notifications')} accessibilityRole="button" style={s.bell}>
           <Ionicons name="notifications-outline" size={18} color="#fff" />
           <Text style={s.bellText}>
@@ -149,6 +155,6 @@ const s = StyleSheet.create({
   bell: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: space.sm, alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
   bellText: { color: '#fff', fontWeight: '600' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
-  tile: { width: '23%', flexGrow: 1, minWidth: 76, backgroundColor: '#fff', borderRadius: 12, paddingVertical: space.md, alignItems: 'center', gap: 6, borderWidth: 1, borderColor: colors.border },
+  tile: { width: '31%', flexGrow: 1, minWidth: 90, backgroundColor: '#fff', borderRadius: 12, paddingVertical: space.md, alignItems: 'center', gap: 6, borderWidth: 1, borderColor: colors.border },
   tileText: { fontSize: 12, fontWeight: '600', color: colors.text, textAlign: 'center' },
 });

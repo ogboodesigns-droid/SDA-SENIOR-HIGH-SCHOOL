@@ -1,22 +1,21 @@
 import { View } from 'react-native';
-import type { ResultRow } from '@sda-shs/shared';
+import { shortLabel, type ResultRow } from '@sda-shs/shared';
 import { useStudentQuery } from '@/lib/auth';
 import { colors } from '@/lib/theme';
 import { useQuery } from '@/lib/useQuery';
 import { ChildSwitcher } from '@/components/ChildSwitcher';
-import { Body, Card, Empty, ErrorNote, Loading, Screen, SectionTitle, Title, styles } from '@/components/ui';
+import { Badge, Body, Card, Empty, ErrorNote, Loading, Screen, SectionTitle, Title, styles } from '@/components/ui';
 
 interface ResultsResponse {
   rows: ResultRow[];
   terms: { termId: string; termName: string; subjects: number; average: number; aggregate: number | null }[];
 }
 
-function Cell({ children, flex = 1, bold }: { children: React.ReactNode; flex?: number; bold?: boolean }) {
-  return (
-    <View style={{ flex }}>
-      <Body style={bold ? { fontWeight: '700' } : undefined}>{children}</Body>
-    </View>
-  );
+function gradeTone(points: number): 'ok' | 'brand' | 'warn' | 'danger' {
+  if (points <= 3) return 'ok';
+  if (points <= 6) return 'brand';
+  if (points <= 8) return 'warn';
+  return 'danger';
 }
 
 export default function ResultsScreen() {
@@ -33,49 +32,39 @@ export default function ResultsScreen() {
           <SectionTitle>{t.termName}</SectionTitle>
           <Card>
             <Title>Average: {t.average}%</Title>
-            {t.aggregate !== null && <Body>Aggregate (best 3 core + best 3 electives): {t.aggregate}</Body>}
             <Body muted>
               {t.subjects} subject{t.subjects === 1 ? '' : 's'}
             </Body>
+            {t.aggregate !== null && <Body>Aggregate (best 3 core + best 3 electives): {t.aggregate}</Body>}
           </Card>
-          <Card>
-            <View style={[styles.row, { borderBottomWidth: 1, borderColor: colors.border, paddingBottom: 6 }]}>
-              <Cell flex={2.6} bold>
-                Subject
-              </Cell>
-              <Cell bold>CA</Cell>
-              <Cell flex={1.2} bold>
-                Exam
-              </Cell>
-              <Cell flex={1.2} bold>
-                Total
-              </Cell>
-              <Cell flex={1.3} bold>
-                Grade
-              </Cell>
-            </View>
-            {results.data!.rows
-              .filter((r) => r.termId === t.termId)
-              .map((r) => (
-                <View key={r.id} style={{ paddingVertical: 6, borderBottomWidth: 1, borderColor: colors.border }}>
-                  <View style={styles.row}>
-                    <Cell flex={2.6}>{r.subjectName}</Cell>
-                    <Cell>{r.caScore}</Cell>
-                    <Cell flex={1.2}>{r.examScore}</Cell>
-                    <Cell flex={1.2} bold>
-                      {r.total}
-                    </Cell>
-                    <Cell flex={1.3} bold>
-                      {r.grade}
-                    </Cell>
+          {results
+            .data!.rows.filter((r) => r.termId === t.termId)
+            .map((r) => (
+              <Card key={r.id}>
+                <View style={[styles.row, { justifyContent: 'space-between' }]}>
+                  <View style={{ flex: 1 }}>
+                    <Title>{r.subjectName}</Title>
+                    <Body muted>
+                      {r.total}% · {r.remark}
+                    </Body>
                   </View>
-                  <View style={styles.row}>
-                    <Body muted>{r.remark}</Body>
-                  </View>
-                  {r.teacherComment && <Body muted>“{r.teacherComment}”</Body>}
+                  <Badge label={r.grade} tone={gradeTone(r.gradePoint)} />
                 </View>
-              ))}
-          </Card>
+                {r.breakdown.some((b) => b.score !== null) && (
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                    {r.breakdown.map((b) => (
+                      <View key={b.key} style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
+                        <Body style={{ fontSize: 12, color: colors.muted }}>{shortLabel({ ...b, isExam: b.key === 'exam' })}</Body>
+                        <Body style={{ fontWeight: '700' }}>
+                          {b.score ?? '–'}/{b.weight}
+                        </Body>
+                      </View>
+                    ))}
+                  </View>
+                )}
+                {r.teacherComment && <Body muted>“{r.teacherComment}”</Body>}
+              </Card>
+            ))}
         </View>
       ))}
     </Screen>

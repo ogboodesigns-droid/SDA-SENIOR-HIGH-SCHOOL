@@ -29,6 +29,7 @@ export interface StudentSummary {
   programmeName: string;
   /** Class plus option letter as on the combination list, e.g. "1BUS 2A". */
   groupName: string;
+  combinationId: string | null;
   houseId: string | null;
   houseName: string | null;
 }

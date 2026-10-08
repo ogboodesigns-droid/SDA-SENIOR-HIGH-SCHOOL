@@ -2,26 +2,39 @@
 
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { gradeFor, type GradingScaleInput, type ResultRow, type StudentSummary, type TermSummary } from '@sda-shs/shared';
+import {
+  gradeFor,
+  shortLabel,
+  summariseScores,
+  type AssessmentSchemesInput,
+  type GradingScaleInput,
+  type ResultRow,
+  type StudentSummary,
+  type TermSummary,
+} from '@sda-shs/shared';
 import { api, errorMessage, useApi } from '@/lib/api';
 import { useCan } from '@/lib/me';
 import { ClassSubjectPicker } from '@/components/class-subject-picker';
 import { Alert, Card, Empty, Field, Loading, PageHeader } from '@/components/ui';
 
 interface Draft {
-  ca: string;
-  exam: string;
+  /** Component key → mark as typed ('' = not entered). */
+  marks: Record<string, string>;
   comment: string;
 }
+
+const blank = (): Draft => ({ marks: {}, comment: '' });
 
 function Results() {
   const params = useSearchParams();
   const canPublish = useCan('results:publish');
   const terms = useApi<TermSummary[]>('/terms');
   const scale = useApi<GradingScaleInput>('/school/grading-scale');
+  const schemes = useApi<AssessmentSchemesInput>('/school/assessment-schemes');
   const [termId, setTermId] = useState('');
   const [pick, setPick] = useState({ classId: params.get('classId') ?? '', subjectId: params.get('subjectId') ?? '' });
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
+  const [dirty, setDirty] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState<{ kind: 'error' | 'success'; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -29,25 +42,46 @@ function Results() {
     if (!termId && terms.data?.length) setTermId((terms.data.find((t) => t.isCurrent) ?? terms.data[0]).id);
   }, [terms.data, termId]);
 
+  const term = terms.data?.find((t) => t.id === termId);
+  const components = schemes.data && term ? schemes.data[term.semester === 2 ? '2' : '1'] : [];
   const ready = termId && pick.classId && pick.subjectId;
-  const students = useApi<StudentSummary[]>(pick.classId ? `/classes/${pick.classId}/students` : null);
+  // Only students whose option includes this subject.
+  const students = useApi<StudentSummary[]>(ready ? `/classes/${pick.classId}/students?subjectId=${pick.subjectId}` : null);
   const sheet = useApi<ResultRow[]>(ready ? `/results/sheet?termId=${termId}&classId=${pick.classId}&subjectId=${pick.subjectId}` : null);
 
   useEffect(() => {
     const next: Record<string, Draft> = {};
-    for (const r of sheet.data ?? []) next[r.studentId] = { ca: String(r.caScore), exam: String(r.examScore), comment: r.teacherComment ?? '' };
+    for (const r of sheet.data ?? []) {
+      next[r.studentId] = {
+        marks: Object.fromEntries(r.breakdown.map((b) => [b.key, b.score === null ? '' : String(b.score)])),
+        comment: r.teacherComment ?? '',
+      };
+    }
     setDrafts(next);
+    setDirty(new Set());
   }, [sheet.data]);
 
   const byStudent = useMemo(() => new Map(sheet.data?.map((r) => [r.studentId, r])), [sheet.data]);
-  const anyPublished = sheet.data?.some((r) => r.published);
+
+  function set(studentId: string, key: string, value: string) {
+    setDrafts((d) => {
+      const cur = d[studentId] ?? blank();
+      return { ...d, [studentId]: key === '$comment' ? { ...cur, comment: value } : { ...cur, marks: { ...cur.marks, [key]: value } } };
+    });
+    setDirty((s) => new Set(s).add(studentId));
+  }
 
   async function save() {
-    const entries = Object.entries(drafts)
-      .filter(([, d]) => d.ca !== '' && d.exam !== '')
-      .map(([studentId, d]) => ({ studentId, caScore: Number(d.ca), examScore: Number(d.exam), teacherComment: d.comment || null }));
+    const entries = [...dirty].map((studentId) => {
+      const d = drafts[studentId] ?? blank();
+      return {
+        studentId,
+        scores: Object.fromEntries(components.map((c) => [c.key, d.marks[c.key] === undefined || d.marks[c.key] === '' ? null : Number(d.marks[c.key])])),
+        teacherComment: d.comment || null,
+      };
+    });
     if (!entries.length) {
-      setMessage({ kind: 'error', text: 'Enter at least one complete row (CA and exam).' });
+      setMessage({ kind: 'error', text: 'Nothing has changed.' });
       return;
     }
     setBusy(true);
@@ -55,7 +89,7 @@ function Results() {
     try {
       const rows = await api<ResultRow[]>('/results', { method: 'PUT', body: { termId, classId: pick.classId, subjectId: pick.subjectId, entries } });
       sheet.setData(rows);
-      setMessage({ kind: 'success', text: `Saved ${entries.length} result(s). They stay private until the school publishes them.` });
+      setMessage({ kind: 'success', text: `Saved marks for ${entries.length} student(s). They stay private until the school publishes them.` });
     } catch (e) {
       setMessage({ kind: 'error', text: errorMessage(e) });
     } finally {
@@ -64,35 +98,35 @@ function Results() {
   }
 
   async function publish(all: boolean) {
-    if (!confirm(all ? 'Publish ALL saved subjects for this class? Students and parents will be notified.' : 'Publish this subject for this class? Students and parents will be notified.')) return;
+    if (!confirm(all ? 'Publish ALL complete results for this class? Students and parents will be notified.' : 'Publish complete results for this subject? Students and parents will be notified.')) return;
     try {
-      const res = await api<{ published: number; students: number }>('/results/publish', {
+      const res = await api<{ published: number; students: number; incomplete: number }>('/results/publish', {
         method: 'POST',
         body: { termId, classId: pick.classId, ...(all ? {} : { subjectId: pick.subjectId }) },
       });
       await sheet.reload();
-      setMessage({ kind: 'success', text: `Published ${res.published} result(s) for ${res.students} student(s).` });
+      setMessage({
+        kind: 'success',
+        text: `Published ${res.published} result(s) for ${res.students} student(s).${res.incomplete ? ` ${res.incomplete} result(s) are missing marks and were not published.` : ''}`,
+      });
     } catch (e) {
       setMessage({ kind: 'error', text: errorMessage(e) });
     }
   }
-
-  const set = (id: string, key: keyof Draft, value: string) =>
-    setDrafts((d) => ({ ...d, [id]: { ...(d[id] ?? { ca: '', exam: '', comment: '' }), [key]: value } }));
 
   return (
     <>
       <PageHeader
         title="Results"
         description={
-          scale.data
-            ? `Continuous assessment out of ${scale.data.caMax}, examination out of ${scale.data.examMax}. Grades are calculated from the school's grading scale.`
+          components.length
+            ? `Marks per assessment: ${components.map((c) => `${shortLabel(c)} /${c.weight}`).join(' · ')}. Graded on the WASSCE scale. Marks can be entered through the semester; only complete results can be published.`
             : undefined
         }
       />
       <Card>
         <div className="grid">
-          <Field label="Term">
+          <Field label="Semester">
             <select value={termId} onChange={(e) => setTermId(e.target.value)}>
               {terms.data?.map((t) => (
                 <option key={t.id} value={t.id}>
@@ -110,9 +144,8 @@ function Results() {
           title="Mark sheet"
           actions={
             <div className="row">
-              {anyPublished && <span className="badge ok">Published</span>}
-              <button onClick={save} disabled={busy}>
-                {busy ? 'Saving…' : 'Save'}
+              <button onClick={save} disabled={busy || !dirty.size}>
+                {busy ? 'Saving…' : dirty.size ? `Save (${dirty.size})` : 'Saved'}
               </button>
               {canPublish && (
                 <>
@@ -131,15 +164,19 @@ function Results() {
           {students.loading || sheet.loading ? (
             <Loading />
           ) : !students.data?.length ? (
-            <Empty>No students in this class.</Empty>
+            <Empty>No students in this class take this subject.</Empty>
           ) : (
             <div className="table-wrap">
               <table>
                 <thead>
                   <tr>
                     <th>Student</th>
-                    <th>CA</th>
-                    <th>Exam</th>
+                    {components.map((c) => (
+                      <th key={c.key} title={c.label}>
+                        {shortLabel(c)}
+                        <div style={{ textTransform: 'none', fontWeight: 400 }}>/{c.weight}</div>
+                      </th>
+                    ))}
                     <th>Total</th>
                     <th>Grade</th>
                     <th>Comment</th>
@@ -147,29 +184,49 @@ function Results() {
                 </thead>
                 <tbody>
                   {students.data.map((s) => {
-                    const d = drafts[s.id] ?? { ca: '', exam: '', comment: '' };
-                    const total = d.ca !== '' && d.exam !== '' ? Number(d.ca) + Number(d.exam) : null;
-                    const preview = total !== null && scale.data ? gradeFor(total, scale.data.bands).grade : '';
+                    const d = drafts[s.id] ?? blank();
+                    const numbers = Object.fromEntries(
+                      components.map((c) => [c.key, d.marks[c.key] === undefined || d.marks[c.key] === '' ? null : Number(d.marks[c.key])]),
+                    );
+                    const summary = summariseScores(components, numbers);
+                    const anyMark = Object.values(numbers).some((v) => v !== null);
                     const saved = byStudent.get(s.id);
                     return (
                       <tr key={s.id}>
                         <td>
                           {s.fullName}
-                          <div className="muted">{s.studentNumber}</div>
+                          <div className="muted">
+                            {s.groupName} · {s.studentNumber}
+                          </div>
+                        </td>
+                        {components.map((c) => (
+                          <td key={c.key}>
+                            <input
+                              type="number"
+                              step="0.5"
+                              min={0}
+                              max={c.weight}
+                              value={d.marks[c.key] ?? ''}
+                              onChange={(e) => set(s.id, c.key, e.target.value)}
+                              aria-label={`${c.label} for ${s.fullName}`}
+                              style={{ width: 72, minWidth: 0 }}
+                            />
+                          </td>
+                        ))}
+                        <td>
+                          {anyMark ? summary.total : '—'}
+                          {anyMark && !summary.complete && <div className="field-hint">incomplete</div>}
                         </td>
                         <td>
-                          <input type="number" step="0.5" min={0} max={scale.data?.caMax} value={d.ca} onChange={(e) => set(s.id, 'ca', e.target.value)} aria-label={`CA for ${s.fullName}`} />
+                          {anyMark && scale.data ? gradeFor(summary.total, scale.data.bands).grade : ''}
+                          {saved?.published && (
+                            <span className="badge ok" style={{ marginLeft: 6 }}>
+                              published
+                            </span>
+                          )}
                         </td>
                         <td>
-                          <input type="number" step="0.5" min={0} max={scale.data?.examMax} value={d.exam} onChange={(e) => set(s.id, 'exam', e.target.value)} aria-label={`Exam for ${s.fullName}`} />
-                        </td>
-                        <td>{total ?? '—'}</td>
-                        <td>
-                          {preview}
-                          {saved?.published && <span className="badge ok" style={{ marginLeft: 6 }}>published</span>}
-                        </td>
-                        <td>
-                          <input value={d.comment} onChange={(e) => set(s.id, 'comment', e.target.value)} maxLength={500} aria-label={`Comment for ${s.fullName}`} />
+                          <input value={d.comment} onChange={(e) => set(s.id, '$comment', e.target.value)} maxLength={500} aria-label={`Comment for ${s.fullName}`} />
                         </td>
                       </tr>
                     );

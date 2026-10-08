@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { GradingScaleInput, SchoolProfile } from '@sda-shs/shared';
+import type { AssessmentComponent, AssessmentSchemesInput, GradingScaleInput, SchoolProfile } from '@sda-shs/shared';
 import { api, useApi } from '@/lib/api';
 import { Alert, blankToNull, Card, Field, Loading, PageHeader, useSubmit } from '@/components/ui';
 
@@ -95,14 +95,6 @@ function GradingScale() {
   return (
     <form className="stack" onSubmit={save.onSubmit}>
       <Alert kind="info">The WASSCE grading scale (A1 = 1 … F9 = 9). Grade points are used for the aggregate of the best three core and three elective subjects.</Alert>
-      <div className="row">
-        <Field label="CA out of">
-          <input type="number" value={draft.caMax} onChange={(e) => setDraft({ ...draft, caMax: Number(e.target.value) })} style={{ maxWidth: 100 }} />
-        </Field>
-        <Field label="Exam out of">
-          <input type="number" value={draft.examMax} onChange={(e) => setDraft({ ...draft, examMax: Number(e.target.value) })} style={{ maxWidth: 100 }} />
-        </Field>
-      </div>
       <table>
         <thead>
           <tr>
@@ -149,12 +141,79 @@ function GradingScale() {
   );
 }
 
+function AssessmentSchemes() {
+  const schemes = useApi<AssessmentSchemesInput>('/school/assessment-schemes');
+  const [draft, setDraft] = useState<AssessmentSchemesInput | null>(null);
+  useEffect(() => setDraft(schemes.data ?? null), [schemes.data]);
+  const save = useSubmit(async () => {
+    if (!draft) return;
+    await api('/school/assessment-schemes', { method: 'PUT', body: draft });
+    await schemes.reload();
+    return 'Assessment scheme saved. It applies to marks entered from now on.';
+  });
+  if (!draft) return <Loading />;
+
+  const update = (sem: '1' | '2', i: number, patch: Partial<AssessmentComponent>) =>
+    setDraft({ ...draft, [sem]: draft[sem].map((c, j) => (j === i ? { ...c, ...patch } : c)) });
+
+  return (
+    <form className="stack" onSubmit={save.onSubmit}>
+      <p className="muted" style={{ margin: 0 }}>
+        Each component&apos;s weight is the mark teachers enter it out of. Weights must add up to 100 for each semester.
+      </p>
+      {(['1', '2'] as const).map((sem) => {
+        const total = draft[sem].reduce((s, c) => s + c.weight, 0);
+        return (
+          <div key={sem} className="stack">
+            <h2>
+              Semester {sem}{' '}
+              <span className={`badge ${total === 100 ? 'ok' : 'danger'}`}>total {total}%</span>
+            </h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>Mode of assessment</th>
+                  <th>Weight</th>
+                  <th>End-of-semester exam</th>
+                </tr>
+              </thead>
+              <tbody>
+                {draft[sem].map((c, i) => (
+                  <tr key={c.key}>
+                    <td>
+                      <input value={c.label} onChange={(e) => update(sem, i, { label: e.target.value })} aria-label="Mode of assessment" />
+                    </td>
+                    <td>
+                      <input type="number" min={1} max={100} value={c.weight} onChange={(e) => update(sem, i, { weight: Number(e.target.value) })} style={{ maxWidth: 90 }} aria-label="Weight" />
+                    </td>
+                    <td>
+                      <input type="checkbox" checked={c.isExam} onChange={(e) => update(sem, i, { isExam: e.target.checked })} aria-label="Exam" />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      })}
+      <Alert>{save.error}</Alert>
+      <Alert kind="success">{save.success}</Alert>
+      <div>
+        <button disabled={save.busy}>Save assessment scheme</button>
+      </div>
+    </form>
+  );
+}
+
 export default function SchoolPage() {
   const profile = useApi<SchoolProfile>('/school');
   return (
     <>
       <PageHeader title="School profile" description="Shown in the mobile app's About the School section. Only enter official, verified information." />
       <Card title="About the school">{profile.data ? <ProfileForm profile={profile.data} onSaved={profile.reload} /> : <Loading />}</Card>
+      <Card title="Assessment modes and marks distribution">
+        <AssessmentSchemes />
+      </Card>
       <Card title="Grading scale">
         <GradingScale />
       </Card>

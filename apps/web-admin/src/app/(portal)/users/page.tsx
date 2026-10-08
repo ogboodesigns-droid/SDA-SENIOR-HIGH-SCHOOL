@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { ROLE_LABELS, ROLES, type Paginated, type Role, type UserListItem } from '@sda-shs/shared';
+import { ROLE_LABELS, ROLES, type House, type Paginated, type Role, type SubjectCombination, type UserListItem } from '@sda-shs/shared';
 import { api, formatDate, useApi } from '@/lib/api';
 import { useCan, useMe } from '@/lib/me';
 import { Alert, blankToNull, Card, Empty, Field, Loading, PageHeader, useSubmit } from '@/components/ui';
@@ -10,12 +10,19 @@ import { Alert, blankToNull, Card, Empty, Field, Loading, PageHeader, useSubmit 
 interface ClassOption {
   id: string;
   name: string;
+  programmeId: string;
+  stream: number | null;
 }
 
 function CreateUser({ onCreated }: { onCreated: () => void }) {
   const me = useMe();
   const [role, setRole] = useState<Role>('student');
+  const [classId, setClassId] = useState('');
   const classes = useApi<ClassOption[]>('/classes');
+  const houses = useApi<House[]>('/houses');
+  const cls = classes.data?.find((c) => c.id === classId);
+  const combos = useApi<SubjectCombination[]>(cls ? `/combinations?programmeId=${cls.programmeId}` : null);
+  const options = combos.data?.filter((c) => cls?.stream == null || c.stream === cls.stream) ?? [];
   const roles = ROLES.filter((r) => r !== 'super_admin' || me.role === 'super_admin');
 
   const { onSubmit, busy, error, success } = useSubmit(async (v, form) => {
@@ -27,7 +34,16 @@ function CreateUser({ onCreated }: { onCreated: () => void }) {
         email: blankToNull(v.email),
         phone: blankToNull(v.phone),
         temporaryPassword: v.temporaryPassword,
-        student: role === 'student' ? { studentNumber: v.studentNumber, classId: v.classId, dateOfBirth: blankToNull(v.dateOfBirth) } : undefined,
+        student:
+          role === 'student'
+            ? {
+                studentNumber: v.studentNumber,
+                classId,
+                combinationId: blankToNull(v.combinationId),
+                houseId: blankToNull(v.houseId),
+                dateOfBirth: blankToNull(v.dateOfBirth),
+              }
+            : undefined,
         staff: role !== 'student' && role !== 'parent' && v.staffNumber ? { staffNumber: v.staffNumber } : undefined,
       },
     });
@@ -64,13 +80,33 @@ function CreateUser({ onCreated }: { onCreated: () => void }) {
                 <input name="studentNumber" required />
               </Field>
               <Field label="Class">
-                <select name="classId" required defaultValue="">
+                <select required value={classId} onChange={(e) => setClassId(e.target.value)}>
                   <option value="" disabled>
                     Choose a class
                   </option>
                   {classes.data?.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Option (subject combination)" hint={cls && !options.length ? 'No options set up for this class' : undefined}>
+                <select name="combinationId" defaultValue="" key={classId}>
+                  <option value="">Not chosen yet</option>
+                  {options.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {`${cls?.name ?? ''}${o.letter}`} · Option {o.option}: {o.electives.map((e) => e.name).join(', ')}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="House">
+                <select name="houseId" defaultValue="">
+                  <option value="">Not assigned</option>
+                  {houses.data?.map((h) => (
+                    <option key={h.id} value={h.id}>
+                      {h.name}
                     </option>
                   ))}
                 </select>

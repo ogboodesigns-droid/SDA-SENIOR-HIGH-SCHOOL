@@ -18,12 +18,13 @@ Students and parents use the phone app; teachers and administrators do the heavi
 - **Secure accounts** for students, parents/guardians, teachers and staff, created by the school (no public sign-up). Sign in with a student number, staff number, email or phone. Temporary passwords must be changed at first sign-in.
 - **Role-based access** (super admin, head, assistant head, teacher, accountant, librarian, counsellor, parent, student) plus record-level rules: students see only their own records, parents only their linked children, teachers only the classes they teach.
 - **School profile**: name, motto, vision, mission, core values, history and contacts, all editable in the portal.
-- **Academic structure**: academic years, terms, programmes, classes, subjects, and which teacher takes each subject in each class. Classes follow the school's naming — form, programme code, class number (1 SCI 1, 2 BUS 2, 3 GA 6) — and a whole programme's classes can be created in one step (e.g. General Arts with 6 classes per form), with single classes addable at any time.
+- **Academic structure** loaded from the school's *2026/2027 Subject Combination* lists: the five core subjects, 24 electives and the six learning areas (General Science, General Arts, Visual Arts, Business, Home Economics, Languages) with every option. Classes use the official codes — 1G/S 1, 1BUS 2, 2G/A 3, 3H/E 1, 1VIS 2 — and a learning area's classes can be created for chosen forms in one step, each pre-filled with the subjects its options need. Each student is placed in an option (e.g. 1BUS 1B), which decides their electives, assignments, timetable and mark sheets; Science students don't take General Science. Two semesters per academic year.
+- **Houses**: Gye Nyame, Asokore, Agyei Sarfo and Kuma Korante, with students assigned, a points table kept by leadership, and house-targeted notices.
 - **Timetable** per class and term, with class and teacher clash detection; personal weekly view in the app.
 - **Announcements** by category (Academic, Examination, Sports, SRC, PTA, Religious, Emergency…), targeted at the whole school, a role, a form, a programme or a class, with scheduling, expiry, priority and optional push notifications.
 - **School calendar** of events, also audience-targeted.
 - **Assignments**: teachers set work; students submit text and/or a PDF, Word document or photo; teachers mark with feedback; late submissions are flagged.
-- **Results**: CA + exam entry per class and subject, grades computed on the **WASSCE scale** (A1 75–100 … F9 0–39, grade points 1–9) with a term average and aggregate (best 3 core + best 3 electives), kept private until leadership publishes them, then visible to the student and their parents.
+- **Results**: marks entered per assessment mode — Individual Class Assessments 15, Mid-Semester 15, Practical/Portfolio 10, Group (Sem 1) or Individual (Sem 2) Projects 20, Supervised Semester Assessment 40 — through the semester; graded on the **WASSCE scale** (A1 75–100 … F9 0–39, grade points 1–9) with an average and aggregate (best 3 core + best 3 electives), kept private until leadership publishes them (only results with every mark entered can be published), then visible to the student and their parents.
 - **Notifications**: in-app inbox plus Expo push notifications for new assignments, marked work, published results and announcements.
 - **Faith & Spiritual Life** section built from the school's religious announcements and programmes.
 - **Read aloud** for announcements (text-to-speech).
@@ -47,7 +48,7 @@ pnpm --filter @sda-shs/api build
 pnpm db:migrate
 
 # First-time setup: the school's official name and the first super administrator
-# (the school's name, motto and address are filled in automatically)
+# (fills in the school's name, motto and address, and loads subjects, learning areas, options and houses)
 ADMIN_NAME="Your Name" ADMIN_EMAIL="you@example.com" ADMIN_PASSWORD="a-strong-password-1" pnpm db:bootstrap
 
 pnpm dev:api        # http://localhost:4000
@@ -89,4 +90,6 @@ packages/
   shared/       roles, permissions, Zod schemas, wire types, grading
 docker/         Dockerfiles for the API and portal
 docs/           architecture, security and roadmap
+
+apps/api/src/database/school-catalogue.ts   the school's subjects, options and houses (re-run safely with pnpm --filter @sda-shs/api db:catalogue)
 ```

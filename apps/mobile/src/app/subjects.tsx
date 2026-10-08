@@ -13,7 +13,7 @@ export default function SubjectsScreen() {
       {subjects.loading && <Loading />}
       {subjects.data && !subjects.data.length && <Empty>No subjects have been set up for this class yet.</Empty>}
       {subjects.data?.map((s) => (
-        <Card key={s.classSubjectId}>
+        <Card key={s.subjectId}>
           <Badge label={s.isCore ? 'CORE' : 'ELECTIVE'} tone={s.isCore ? 'brand' : 'muted'} />
           <Title>{s.name}</Title>
           <Body muted>{s.teacherName ?? 'Teacher to be assigned'}</Body>

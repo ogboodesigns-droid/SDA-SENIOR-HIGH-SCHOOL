@@ -171,7 +171,7 @@ export const terms = pgTable(
 export const programmes = pgTable('programmes', {
   id: id(),
   name: text('name').notNull().unique(),
-  /** Short code used in class names: "SCI" in "1 SCI 2". Required by the API for new programmes. */
+  /** Short code used in class names: "BUS" in "1BUS 2". Required by the API for new programmes. */
   code: text('code').unique(),
   /** What people call the classes: "Arts" → "Arts 1", "Arts 2". */
   label: text('label'),
@@ -252,7 +252,7 @@ export const classes = pgTable(
     id: id(),
     name: text('name').notNull().unique(),
     form: smallint('form').notNull(),
-    /** Stream number within the form and programme: the "2" in "1 SCI 2". */
+    /** Stream number within the form and programme: the "2" in "1BUS 2". */
     stream: smallint('stream'),
     programmeId: uuid('programme_id')
       .notNull()

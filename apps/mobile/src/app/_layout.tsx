@@ -42,6 +42,7 @@ function Gate() {
       <Stack.Screen name="notifications" options={{ title: 'Notifications' }} />
       <Stack.Screen name="school" options={{ title: 'About the School' }} />
       <Stack.Screen name="faith" options={{ title: 'Faith & Spiritual Life' }} />
+      <Stack.Screen name="houses" options={{ title: 'Houses' }} />
     </Stack>
   );
 }

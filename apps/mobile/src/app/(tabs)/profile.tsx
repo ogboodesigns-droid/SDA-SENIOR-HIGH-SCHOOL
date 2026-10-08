@@ -37,9 +37,10 @@ export default function ProfileScreen() {
         <Badge label={ROLE_LABELS[me.role]} />
         {me.student && (
           <Body muted>
-            {me.student.studentNumber} · {me.student.className} · {me.student.programmeName}
+            {me.student.studentNumber} · {me.student.groupName} · {me.student.programmeName}
           </Body>
         )}
+        {me.student?.houseName && <Body muted>{me.student.houseName} House</Body>}
         {me.email && <Body muted>{me.email}</Body>}
         {me.phone && <Body muted>{me.phone}</Body>}
       </Card>
@@ -51,7 +52,8 @@ export default function ProfileScreen() {
             <Card key={c.id}>
               <Title>{c.fullName}</Title>
               <Body muted>
-                {c.studentNumber} · {c.className}
+                {c.studentNumber} · {c.groupName}
+                {c.houseName ? ` · ${c.houseName} House` : ''}
               </Body>
             </Card>
           ))}

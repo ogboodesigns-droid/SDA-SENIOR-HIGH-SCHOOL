@@ -13,9 +13,10 @@ The product specification is split into three releases. V1 is built in this repo
 | School profile (§5) | ✅ | Fully editable, nothing invented |
 | News & announcements (§6) | ✅ | 12 categories, targeting, scheduling, expiry, priority, push |
 | Timetable (§7) | ✅ | Per class/term, clash detection, personal view |
-| Student academic portal (§8) | ✅ | Subjects with teachers |
+| Student academic portal (§8) | ✅ | Subjects from the student's option, with teachers |
+| House system (§17) | ✅ (basic, from V2) | The four houses, membership, points table with history, house notices. Competitions and achievements to follow |
 | Assignments (§9) | ✅ | Text and file submissions, late flag, marking with feedback |
-| Results (§10) | ✅ | CA/exam/total/WASSCE grade and grade point/remark/comment, publish workflow, term average and aggregate. *Class position* is not computed until the school confirms its policy |
+| Results (§10) | ✅ | Marks per assessment mode (15/15/10/20/40), WASSCE grade and grade point, remark, comment, publish workflow (complete results only), semester average and aggregate. *Class position* is not computed until the school confirms its policy |
 | School calendar (§16) | ✅ | Audience-targeted events |
 | Push notifications (§28) | ✅ | Expo push; targeted by school, role, form, programme, class, student and guardians |
 | Admin dashboard (§29) | ✅ (V1 scope) | People, classes & subjects, timetable, announcements, calendar, assignments, results, school profile, audit log |
@@ -30,7 +31,7 @@ The product specification is split into three releases. V1 is built in this repo
 - **Learning materials (§13):** uploads by form → programme → subject → topic, reusing the files module and adding video/audio size limits.
 - **Digital library (§14):** catalogue and e-resources with search; librarian role.
 - **Examination centre (§15):** exam timetables, instructions, mock exams, WASSCE notices.
-- **Houses (§17), clubs & societies (§23), sports (§24):** configurable by the school; house points and leaderboard.
+- **Clubs & societies (§23), sports (§24):** configurable by the school; house competitions and fixtures.
 - **Guidance & counselling (§21):** confidential appointment requests visible only to counsellors; separate audit stream.
 - **Health / sick bay (§22):** notices and appointment requests; medical records only for authorised health staff, with field-level encryption.
 - **Parent portal extras (§20):** absence alerts, fees, teacher comments.
@@ -48,8 +49,9 @@ The product specification is split into three releases. V1 is built in this repo
 ## Information the school needs to provide
 
 - ~~Official name, logo, motto, address~~ ✅ provided. Still needed: vision, mission, core values, history, phone/email and leadership
-- ~~Grading scale~~ ✅ WASSCE. Still needed: confirm the CA/exam split (30/70 assumed) and whether class positions are published
-- Number of classes per form for Science, Business and Languages, and the codes for Home Economics, Visual Arts, Languages and General Arts (HE, VA, LANG, GA assumed)
+- ~~Grading scale and assessment modes~~ ✅ WASSCE; 15/15/10/20/40. Still needed: whether class positions are published
+- ~~Houses~~ ✅ Gye Nyame, Asokore, Agyei Sarfo, Kuma Korante. Optional: house colours and house masters/mistresses
+- ~~Programme codes, options and subjects~~ ✅ from the 2026/27 combination lists. Still needed: the number of classes in SHS 2 and SHS 3 for each learning area, and whether Languages classes are "1L 1" or "1L1" (the list shows "1L1 1A" and "1L2 2A")
 - Subjects and teacher assignments; academic calendar
 - Houses, clubs and religious programme structure (V2)
 - Fees structure and official payment provider details (V2, before any payment integration)

@@ -248,7 +248,7 @@ export const classSchema = z.object({
   name: trimmed(60),
   form: z.number().int().min(1).max(3),
   programmeId: uuid,
-  /** Stream number within the form and programme (the "2" in "1 SCI 2"); used for ordering. */
+  /** Stream number within the form and programme (the "2" in "1BUS 2"); used for ordering. */
   stream: z.number().int().min(1).max(50).nullish(),
   formMasterId: uuid.nullish(),
 });

@@ -17,6 +17,7 @@ const NAV: { href: string; label: string; permission?: Permission }[] = [
   { href: '/timetable', label: 'Timetable', permission: 'timetable:manage' },
   { href: '/users', label: 'People', permission: 'users:read' },
   { href: '/academics', label: 'Classes & subjects', permission: 'academics:manage' },
+  { href: '/houses', label: 'Houses', permission: 'houses:manage' },
   { href: '/school', label: 'School profile', permission: 'school:manage' },
   { href: '/audit', label: 'Audit log', permission: 'audit:read' },
 ];

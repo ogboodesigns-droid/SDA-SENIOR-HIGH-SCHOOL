@@ -22,6 +22,7 @@ export class MeService {
         form: classes.form,
         programmeName: programmes.name,
         letter: subjectCombinations.letter,
+        combinationId: students.combinationId,
         houseId: houses.id,
         houseName: houses.name,
       })
