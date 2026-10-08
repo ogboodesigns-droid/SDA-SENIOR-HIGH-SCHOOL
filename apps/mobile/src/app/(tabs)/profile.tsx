@@ -41,6 +41,7 @@ export default function ProfileScreen() {
           </Body>
         )}
         {me.student?.houseName && <Body muted>{me.student.houseName} House</Body>}
+        {me.student?.droppedSubjectName && <Body muted>Not taking: {me.student.droppedSubjectName}</Body>}
         {me.email && <Body muted>{me.email}</Body>}
         {me.phone && <Body muted>{me.phone}</Body>}
       </Card>

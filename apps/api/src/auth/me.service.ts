@@ -2,7 +2,10 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { eq, inArray } from 'drizzle-orm';
 import { ROLE_PERMISSIONS, type Me, type StudentSummary } from '@sda-shs/shared';
 import { InjectDb, type Database } from '../database/database.module';
-import { classes, guardianStudents, houses, programmes, students, subjectCombinations, users } from '../database/schema';
+import { alias } from 'drizzle-orm/pg-core';
+import { classes, guardianStudents, houses, programmes, students, subjectCombinations, subjects, users } from '../database/schema';
+
+const droppedSubject = alias(subjects, 'dropped_subject');
 
 @Injectable()
 export class MeService {
@@ -23,6 +26,8 @@ export class MeService {
         programmeName: programmes.name,
         letter: subjectCombinations.letter,
         combinationId: students.combinationId,
+        droppedSubjectId: students.droppedSubjectId,
+        droppedSubjectName: droppedSubject.name,
         houseId: houses.id,
         houseName: houses.name,
       })
@@ -32,6 +37,7 @@ export class MeService {
       .innerJoin(programmes, eq(programmes.id, classes.programmeId))
       .leftJoin(subjectCombinations, eq(subjectCombinations.id, students.combinationId))
       .leftJoin(houses, eq(houses.id, students.houseId))
+      .leftJoin(droppedSubject, eq(droppedSubject.id, students.droppedSubjectId))
       .where(cond)
       .orderBy(users.fullName);
     // "1BUS 2" + option letter "A" → "1BUS 2A", as on the combination list.

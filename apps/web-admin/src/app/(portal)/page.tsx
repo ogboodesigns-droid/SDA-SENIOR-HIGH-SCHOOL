@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ROLE_LABELS, type Role } from '@sda-shs/shared';
+import { ROLE_LABELS, type PendingSubjectChoice, type Role } from '@sda-shs/shared';
 import { useApi } from '@/lib/api';
 import { useCan, useMe } from '@/lib/me';
 import { Card, Empty, Loading, PageHeader } from '@/components/ui';
@@ -24,6 +24,7 @@ export default function DashboardPage() {
   const canSeePeople = useCan('users:read');
   const stats = useApi<Dashboard>(canSeePeople ? '/dashboard' : null);
   const teaching = useApi<Teaching[]>(me.role === 'teacher' ? '/me/teaching' : null);
+  const pending = useApi<PendingSubjectChoice[]>(canSeePeople ? '/subject-choices/pending' : null);
 
   return (
     <>
@@ -47,6 +48,39 @@ export default function DashboardPage() {
               </div>
             </div>
           )}
+        </Card>
+      )}
+
+      {!!pending.data?.length && (
+        <Card title={`Students who need to choose a subject (${pending.data.length})`}>
+          <p className="muted" style={{ marginTop: 0 }}>
+            Their option has two subjects at the same time on the timetable (or must drop one before SHS 3). Open each student and set the subject they
+            will not take.
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>Student</th>
+                <th>Class</th>
+                <th>Choose between</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pending.data.map((p) => (
+                <tr key={p.studentId}>
+                  <td>
+                    <Link href={`/users/${p.userId}`}>{p.fullName}</Link>
+                    <div className="muted">{p.studentNumber}</div>
+                  </td>
+                  <td>{p.groupName}</td>
+                  <td>
+                    {p.choices.map((c) => c.name).join(' or ')}
+                    {p.reason === 'drop_before_shs3' && <div className="muted">Drop one before SHS 3</div>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </Card>
       )}
 

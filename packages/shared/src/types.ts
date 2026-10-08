@@ -30,6 +30,9 @@ export interface StudentSummary {
   /** Class plus option letter as on the combination list, e.g. "1BUS 2A". */
   groupName: string;
   combinationId: string | null;
+  /** An elective of the option the student doesn't take (see SubjectChoice). */
+  droppedSubjectId: string | null;
+  droppedSubjectName: string | null;
   houseId: string | null;
   houseName: string | null;
 }
@@ -243,4 +246,33 @@ export interface ApiErrorBody {
   statusCode: number;
   message: string;
   issues?: { path: string; message: string }[];
+}
+
+export interface SubjectRef {
+  id: string;
+  name: string;
+}
+
+export interface SubjectChoice {
+  /** The school still has to record which subject this student drops. */
+  required: boolean;
+  /** timetable_clash: two of the student's electives share every period; drop_before_shs3: a * option in SHS 3. */
+  reason: 'timetable_clash' | 'drop_before_shs3' | null;
+  /** Subjects to choose between when a choice is required. */
+  choices: SubjectRef[];
+  /** Pairs of the student's electives timetabled at the same time. */
+  clashes: [SubjectRef, SubjectRef][];
+  /** Subjects the student may drop at all. */
+  allowed: SubjectRef[];
+  droppedSubjectId: string | null;
+}
+
+export interface PendingSubjectChoice {
+  studentId: string;
+  userId: string;
+  fullName: string;
+  studentNumber: string;
+  groupName: string;
+  reason: 'timetable_clash' | 'drop_before_shs3';
+  choices: SubjectRef[];
 }

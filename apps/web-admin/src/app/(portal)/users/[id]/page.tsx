@@ -1,7 +1,7 @@
 'use client';
 
 import { use, useState } from 'react';
-import { ROLE_LABELS, type House, type Me, type Paginated, type SubjectCombination, type UserListItem } from '@sda-shs/shared';
+import { ROLE_LABELS, type House, type Me, type Paginated, type SubjectChoice, type SubjectCombination, type UserListItem } from '@sda-shs/shared';
 import { api, formatDate, useApi } from '@/lib/api';
 import { useCan } from '@/lib/me';
 import { Alert, Card, Field, Loading, PageHeader, useSubmit } from '@/components/ui';
@@ -23,6 +23,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
   const combos = useApi<SubjectCombination[]>(cls ? `/combinations?programmeId=${cls.programmeId}` : null);
   const options = combos.data?.filter((c) => cls?.stream == null || c.stream === cls.stream) ?? [];
   const [optionId, setOptionId] = useState<string | null>(null);
+  const choice = useApi<SubjectChoice>(user.data?.student ? `/students/${user.data.student.id}/subject-choice` : null);
   const [parentSearch, setParentSearch] = useState('');
   const parents = useApi<Paginated<UserListItem>>(
     canManage && user.data?.role === 'student' && parentSearch.length > 1 ? `/users?role=parent&search=${encodeURIComponent(parentSearch)}` : null,
@@ -110,6 +111,12 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                 <div className="field-label">House</div>
                 {u.student.houseName ?? '—'}
               </div>
+              {(u.student.droppedSubjectName || choice.data?.required) && (
+                <div>
+                  <div className="field-label">Not taking</div>
+                  {u.student.droppedSubjectName ?? <span className="badge warn">Needs a choice: {choice.data?.choices.map((c) => c.name).join(' or ')}</span>}
+                </div>
+              )}
             </>
           )}
         </div>
@@ -117,7 +124,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
           <div className="row" style={{ marginTop: 14 }}>
             <Field label="Move to class">
               <select
-                defaultValue={u.student.classId}
+                value={u.student.classId}
                 onChange={(e) => act(() => api(`/users/${id}`, { method: 'PATCH', body: { classId: e.target.value } }), 'Class updated.')}
               >
                 {classes.data?.map((c) => (
@@ -143,9 +150,36 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                 ))}
               </select>
             </Field>
+            {!!choice.data?.allowed.length && (
+              <Field
+                label="Dropped subject"
+                hint={
+                  choice.data.clashes.length
+                    ? `The timetable runs ${choice.data.clashes.map(([a, b]) => `${a.name} and ${b.name}`).join('; ')} at the same time`
+                    : 'This option must drop one subject before SHS 3'
+                }
+              >
+                <select
+                  value={u.student.droppedSubjectId ?? ''}
+                  onChange={(e) =>
+                    act(async () => {
+                      await api(`/users/${id}`, { method: 'PATCH', body: { droppedSubjectId: e.target.value || null } });
+                      await choice.reload();
+                    }, 'Dropped subject saved.')
+                  }
+                >
+                  <option value="">{choice.data.required ? '— Choose one —' : 'None'}</option>
+                  {choice.data.allowed.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            )}
             <Field label="House">
               <select
-                defaultValue={u.student.houseId ?? ''}
+                value={u.student.houseId ?? ''}
                 onChange={(e) => act(() => api(`/users/${id}`, { method: 'PATCH', body: { houseId: e.target.value || null } }), 'House updated.')}
               >
                 <option value="">Not assigned</option>

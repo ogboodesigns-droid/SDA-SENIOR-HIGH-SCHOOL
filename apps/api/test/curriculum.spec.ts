@@ -305,6 +305,63 @@ describe('options, houses and semester assessment', () => {
     expect(clash.body.warnings).toEqual(expect.arrayContaining(['The teacher is also teaching French to 1G/S 1 at this time']));
   });
 
+  it('students on a clashing option must choose which subject to drop, and then stop seeing it', async () => {
+    const gs = await programme('G/S');
+    const he = await programme('H/E');
+    const [sc] = await db.select().from(schema.classes).where(eq(schema.classes.name, '1G/S 1'));
+    const [he2] = await db.select().from(schema.classes).where(eq(schema.classes.name, '1H/E 2'));
+    const make = async (number: string, classId: string, combinationId: string) =>
+      (
+        await http()
+          .post('/api/v1/users')
+          .set(bearer(head))
+          .send({ fullName: `Student ${number}`, role: 'student', temporaryPassword: PASSWORD, student: { studentNumber: number, classId, combinationId } })
+          .expect(201)
+      ).body as { id: string; student: { id: string } };
+
+    const opt7 = await make('GS7', sc.id, (await option(gs.id, 7)).id); // Geography + Computing, timetabled together
+    const opt2 = await make('GS2', sc.id, (await option(gs.id, 2)).id); // Computing + Business Management: no clash
+    const opt6 = await make('HE6', he2.id, (await option(he.id, 6)).id); // ADF + French, timetabled together
+
+    const choice = async (studentId: string) => (await http().get(`/api/v1/students/${studentId}/subject-choice`).set(bearer(head)).expect(200)).body;
+    const c7 = await choice(opt7.student.id);
+    expect(c7).toMatchObject({ required: true, reason: 'timetable_clash' });
+    expect(c7.choices.map((s: { name: string }) => s.name).sort()).toEqual(['Computing', 'Geography']);
+    expect((await choice(opt2.student.id)).required).toBe(false);
+    expect((await choice(opt6.student.id)).choices.map((s: { name: string }) => s.name).sort()).toEqual(['Art & Design Foundation', 'French']);
+
+    const pending = async () =>
+      (await http().get('/api/v1/subject-choices/pending').set(bearer(head)).expect(200)).body.map((p: { groupName: string }) => p.groupName).sort();
+    expect(await pending()).toEqual(['1G/S 1G', '1H/E 2D']);
+    const teacherToken = (await login(app, 'teacher.a@test.local')).accessToken;
+    await http().get('/api/v1/subject-choices/pending').set(bearer(teacherToken)).expect(403);
+
+    // Only one of the clashing pair can be dropped.
+    const [physics, geography] = [await subjectId('PHY'), await subjectId('GEOG')];
+    await http().patch(`/api/v1/users/${opt7.id}`).set(bearer(head)).send({ droppedSubjectId: physics }).expect(400);
+    const updated = await http().patch(`/api/v1/users/${opt7.id}`).set(bearer(head)).send({ droppedSubjectId: geography }).expect(200);
+    expect(updated.body.student).toMatchObject({ groupName: '1G/S 1G', droppedSubjectName: 'Geography' });
+    expect(await pending()).toEqual(['1H/E 2D']);
+
+    // The student no longer sees, or is marked in, the dropped subject.
+    await db.update(schema.users).set({ mustChangePassword: false });
+    const token = (await login(app, 'GS7')).accessToken;
+    const subjectNames = (await http().get('/api/v1/me/subjects').set(bearer(token)).expect(200)).body.map((s: { name: string }) => s.name);
+    expect(subjectNames).toContain('Computing');
+    expect(subjectNames).not.toContain('Geography');
+    const monP7 = (await http().get(`/api/v1/timetable/mine?termId=${seed.term.id}`).set(bearer(token)).expect(200)).body.filter(
+      (s: { dayOfWeek: number; startsAt: string }) => s.dayOfWeek === 1 && s.startsAt === '14:00',
+    );
+    expect(monP7.map((s: { subjectName: string }) => s.subjectName)).toEqual(['Computing']);
+    const geographyRoster = await http().get(`/api/v1/classes/${sc.id}/students?subjectId=${geography}`).set(bearer(head)).expect(200);
+    expect(geographyRoster.body.map((s: { studentNumber: string }) => s.studentNumber)).not.toContain('GS7');
+
+    // Moving to another option clears the dropped subject.
+    const option1 = (await option(gs.id, 1)).id;
+    const moved = await http().patch(`/api/v1/users/${opt7.id}`).set(bearer(head)).send({ combinationId: option1 }).expect(200);
+    expect(moved.body.student.droppedSubjectId).toBeNull();
+  });
+
   it('houses: leadership awards points; house notices reach that house only', async () => {
     const houses = (await http().get('/api/v1/houses').set(bearer(studentArt)).expect(200)).body;
     const asokore = houses.find((h: { name: string }) => h.name === 'Asokore');

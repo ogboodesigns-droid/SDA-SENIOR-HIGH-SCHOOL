@@ -204,6 +204,21 @@ export class AcademicsController {
     return { added: await this.curriculum.syncClassSubjects(id) };
   }
 
+  // ── Dropped subjects ─────────────────────────────────────────────────────
+
+  /** Students who still need to choose between two electives (or drop one before SHS 3). */
+  @RequirePermissions('users:read')
+  @Get('subject-choices/pending')
+  pendingChoices() {
+    return this.curriculum.pendingChoices();
+  }
+
+  @RequirePermissions('users:read')
+  @Get('students/:id/subject-choice')
+  subjectChoice(@Param('id', ParseUUIDPipe) id: string) {
+    return this.curriculum.subjectChoice(id);
+  }
+
   // ── Options (subject combinations) ────────────────────────────────────────
 
   @Get('combinations')

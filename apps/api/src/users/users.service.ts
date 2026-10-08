@@ -158,8 +158,8 @@ export class UsersService {
     if (id === actor.id && input.status === 'deactivated') {
       throw new BadRequestException('You cannot deactivate your own account');
     }
-    const { classId, combinationId, houseId, ...fields } = input;
-    const studentChanges = classId !== undefined || combinationId !== undefined || houseId !== undefined;
+    const { classId, combinationId, houseId, droppedSubjectId, ...fields } = input;
+    const studentChanges = classId !== undefined || combinationId !== undefined || houseId !== undefined || droppedSubjectId !== undefined;
     if (studentChanges) {
       const [student] = await this.db.select().from(students).where(eq(students.userId, id));
       if (!student) throw new BadRequestException('Only students have a class, option or house');
@@ -170,10 +170,30 @@ export class UsersService {
         targetCombination = null;
       }
       await this.assertOptionFits(targetCombination, targetClass);
+      // A new class or option clears the dropped subject unless one is chosen in the same change.
+      const optionChanged = targetClass !== student.classId || targetCombination !== student.combinationId;
       await this.db
         .update(students)
-        .set({ classId: targetClass, combinationId: targetCombination, houseId: houseId === undefined ? student.houseId : houseId })
+        .set({
+          classId: targetClass,
+          combinationId: targetCombination,
+          houseId: houseId === undefined ? student.houseId : houseId,
+          droppedSubjectId: optionChanged ? null : student.droppedSubjectId,
+        })
         .where(eq(students.id, student.id));
+      if (droppedSubjectId !== undefined) {
+        if (droppedSubjectId) {
+          const allowed = (await this.curriculum.subjectChoice(student.id)).allowed;
+          if (!allowed.some((s) => s.id === droppedSubjectId)) {
+            throw new BadRequestException(
+              allowed.length
+                ? `This student can only drop ${allowed.map((s) => s.name).join(' or ')}`
+                : "This student's option has no subject to drop",
+            );
+          }
+        }
+        await this.db.update(students).set({ droppedSubjectId: droppedSubjectId ?? null }).where(eq(students.id, student.id));
+      }
     }
     await this.db.transaction(async (tx) => {
       if (Object.keys(fields).length) {

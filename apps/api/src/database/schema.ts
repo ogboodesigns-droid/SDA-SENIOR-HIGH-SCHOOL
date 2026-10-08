@@ -308,6 +308,12 @@ export const students = pgTable(
     /** The student's option; decides their elective subjects. */
     combinationId: uuid('combination_id').references(() => subjectCombinations.id, { onDelete: 'set null' }),
     houseId: uuid('house_id').references(() => houses.id, { onDelete: 'set null' }),
+    /**
+     * An elective of the student's option they don't take: one of a pair the
+     * timetable runs at the same time (e.g. Geography / Computing for Science
+     * Option 7), or the subject dropped before SHS 3 on a * option.
+     */
+    droppedSubjectId: uuid('dropped_subject_id').references(() => subjects.id, { onDelete: 'set null' }),
     dateOfBirth: date('date_of_birth'),
   },
   (t) => [index('students_class_idx').on(t.classId)],

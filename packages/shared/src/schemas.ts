@@ -94,6 +94,8 @@ export const updateUserSchema = z.object({
   classId: uuid.optional(),
   combinationId: uuid.nullish(),
   houseId: uuid.nullish(),
+  /** The elective the student doesn't take (one of a clashing pair, or dropped before SHS 3). */
+  droppedSubjectId: uuid.nullish(),
 });
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
 
