@@ -1,5 +1,6 @@
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
+import { sessions } from '../src/database/schema';
 import { createApp, insertUser, login, PASSWORD, resetDatabase, seedSchool, testDb } from './setup';
 
 describe('authentication', () => {
@@ -78,7 +79,12 @@ describe('authentication', () => {
     expect(rotated.body.refreshToken).not.toBe(tokens.refreshToken);
     await http().get('/api/v1/auth/me').set({ authorization: `Bearer ${rotated.body.accessToken}` }).expect(200);
 
-    // Replaying the first token looks like theft: the session ends for everyone holding it.
+    // A concurrent refresh with the old token just fails…
+    await http().post('/api/v1/auth/refresh').send({ refreshToken: tokens.refreshToken }).expect(401);
+    await http().get('/api/v1/auth/me').set({ authorization: `Bearer ${rotated.body.accessToken}` }).expect(200);
+
+    // …but replaying it later looks like theft: the session ends for everyone holding it.
+    await db.update(sessions).set({ lastUsedAt: new Date(Date.now() - 60_000) });
     await http().post('/api/v1/auth/refresh').send({ refreshToken: tokens.refreshToken }).expect(401);
     await http().post('/api/v1/auth/refresh').send({ refreshToken: rotated.body.refreshToken }).expect(401);
     await http().get('/api/v1/auth/me').set({ authorization: `Bearer ${rotated.body.accessToken}` }).expect(401);

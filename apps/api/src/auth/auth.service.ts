@@ -13,6 +13,7 @@ import { MeService } from './me.service';
 
 const MAX_FAILED_LOGINS = 5;
 const LOCKOUT_MINUTES = 15;
+const REFRESH_RACE_GRACE_MS = 30_000;
 
 export interface ClientInfo {
   ip: string | null;
@@ -141,7 +142,9 @@ export class AuthService {
     if (!session || session.session.revokedAt) throw expired;
 
     if (session.session.tokenHash !== presented) {
-      // An old token was replayed: whoever holds it is not the legitimate device.
+      // Two requests from the same device racing to refresh: the loser just retries with the new token.
+      if (Date.now() - session.session.lastUsedAt.getTime() < REFRESH_RACE_GRACE_MS) throw expired;
+      // An old token was replayed later: whoever holds it is not the legitimate device.
       await this.db.update(sessions).set({ revokedAt: new Date() }).where(eq(sessions.id, session.session.id));
       await this.audit.record({
         actorId: session.session.userId,
