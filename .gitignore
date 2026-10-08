@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.next/
+.expo/
+build/
+coverage/
+*.tsbuildinfo
+.env
+.env.*.local
+!.env.example
+uploads/
+web-build/
+android/
+ios/
+.DS_Store
+npm-debug.log*

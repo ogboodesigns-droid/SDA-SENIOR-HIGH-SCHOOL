@@ -1,0 +1,21 @@
+{
+  "name": "sda-shs",
+  "private": true,
+  "description": "SDA Senior High School — mobile app, web administration portal and API",
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=20.19"
+  },
+  "scripts": {
+    "build:shared": "pnpm --filter @sda-shs/shared build",
+    "build": "pnpm build:shared && pnpm --filter @sda-shs/api build && pnpm --filter @sda-shs/web-admin build",
+    "typecheck": "pnpm build:shared && pnpm -r --parallel typecheck",
+    "test": "pnpm build:shared && pnpm -r test",
+    "dev:api": "pnpm --filter @sda-shs/api dev",
+    "dev:admin": "pnpm --filter @sda-shs/web-admin dev",
+    "dev:mobile": "pnpm --filter @sda-shs/mobile start",
+    "db:generate": "pnpm --filter @sda-shs/api db:generate",
+    "db:migrate": "pnpm --filter @sda-shs/api db:migrate",
+    "db:bootstrap": "pnpm --filter @sda-shs/api db:bootstrap"
+  }
+}

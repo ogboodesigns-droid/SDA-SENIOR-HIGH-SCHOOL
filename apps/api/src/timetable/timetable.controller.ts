@@ -1,0 +1,116 @@
+import { Body, ConflictException, Controller, Delete, Get, HttpCode, Module, NotFoundException, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
+import { and, asc, eq, gt, lt, ne, type SQL } from 'drizzle-orm';
+import { timetableEntrySchema, type TimetableEntryInput, type TimetableSlot } from '@sda-shs/shared';
+import { InjectDb, type Database } from '../database/database.module';
+import { classes, classSubjects, subjects, terms, timetableEntries, users } from '../database/schema';
+import type { AuthUser } from '../common/auth-user';
+import { CurrentUser, RequirePermissions } from '../common/decorators';
+import { ZodPipe } from '../common/zod.pipe';
+import { AccessService } from '../access/access.service';
+
+@Controller('timetable')
+export class TimetableController {
+  constructor(
+    @InjectDb() private readonly db: Database,
+    private readonly access: AccessService,
+  ) {}
+
+  private async termOrCurrent(termId?: string): Promise<string | null> {
+    if (termId) return termId;
+    const [row] = await this.db.select({ id: terms.id }).from(terms).where(eq(terms.isCurrent, true));
+    return row?.id ?? null;
+  }
+
+  private slots(where: SQL | undefined): Promise<TimetableSlot[]> {
+    return this.db
+      .select({
+        id: timetableEntries.id,
+        dayOfWeek: timetableEntries.dayOfWeek,
+        startsAt: timetableEntries.startsAt,
+        endsAt: timetableEntries.endsAt,
+        room: timetableEntries.room,
+        subjectId: subjects.id,
+        subjectName: subjects.name,
+        classId: classes.id,
+        className: classes.name,
+        teacherName: users.fullName,
+      })
+      .from(timetableEntries)
+      .innerJoin(subjects, eq(subjects.id, timetableEntries.subjectId))
+      .innerJoin(classes, eq(classes.id, timetableEntries.classId))
+      .leftJoin(
+        classSubjects,
+        and(eq(classSubjects.classId, timetableEntries.classId), eq(classSubjects.subjectId, timetableEntries.subjectId)),
+      )
+      .leftJoin(users, eq(users.id, classSubjects.teacherId))
+      .where(where)
+      .orderBy(asc(timetableEntries.dayOfWeek), asc(timetableEntries.startsAt))
+      .then((rows) => rows.map((r) => ({ ...r, startsAt: r.startsAt.slice(0, 5), endsAt: r.endsAt.slice(0, 5) })));
+  }
+
+  /**
+   * The signed-in user's own week: a student's class, a parent's child
+   * (?studentId), or every period a teacher takes.
+   */
+  @Get('mine')
+  async mine(@CurrentUser() user: AuthUser, @Query('studentId') studentId?: string, @Query('termId') termId?: string) {
+    const term = await this.termOrCurrent(termId);
+    if (!term) return [];
+    if (user.role === 'teacher') {
+      return this.slots(and(eq(timetableEntries.termId, term), eq(classSubjects.teacherId, user.id)));
+    }
+    const student = await this.access.resolveOwnStudent(user, studentId);
+    return this.slots(and(eq(timetableEntries.termId, term), eq(timetableEntries.classId, student.classId)));
+  }
+
+  @Get('class/:classId')
+  async forClass(@CurrentUser() user: AuthUser, @Param('classId', ParseUUIDPipe) classId: string, @Query('termId') termId?: string) {
+    await this.access.assertCanReadClass(user, classId);
+    const term = await this.termOrCurrent(termId);
+    if (!term) return [];
+    return this.slots(and(eq(timetableEntries.termId, term), eq(timetableEntries.classId, classId)));
+  }
+
+  @RequirePermissions('timetable:manage')
+  @Post()
+  async create(@Body(new ZodPipe(timetableEntrySchema)) body: TimetableEntryInput) {
+    const [assigned] = await this.db
+      .select({ teacherId: classSubjects.teacherId })
+      .from(classSubjects)
+      .where(and(eq(classSubjects.classId, body.classId), eq(classSubjects.subjectId, body.subjectId)));
+    if (!assigned) throw new NotFoundException('Add this subject to the class before timetabling it');
+
+    const overlaps = and(
+      eq(timetableEntries.termId, body.termId),
+      eq(timetableEntries.dayOfWeek, body.dayOfWeek),
+      lt(timetableEntries.startsAt, body.endsAt),
+      gt(timetableEntries.endsAt, body.startsAt),
+    );
+    const [classClash] = await this.db.select({ id: timetableEntries.id }).from(timetableEntries).where(and(overlaps, eq(timetableEntries.classId, body.classId))).limit(1);
+    if (classClash) throw new ConflictException('The class already has a lesson at this time');
+
+    if (assigned.teacherId) {
+      const [teacherClash] = await this.db
+        .select({ className: classes.name })
+        .from(timetableEntries)
+        .innerJoin(classSubjects, and(eq(classSubjects.classId, timetableEntries.classId), eq(classSubjects.subjectId, timetableEntries.subjectId)))
+        .innerJoin(classes, eq(classes.id, timetableEntries.classId))
+        .where(and(overlaps, eq(classSubjects.teacherId, assigned.teacherId), ne(timetableEntries.classId, body.classId)))
+        .limit(1);
+      if (teacherClash) throw new ConflictException(`The teacher is already teaching ${teacherClash.className} at this time`);
+    }
+
+    const [row] = await this.db.insert(timetableEntries).values({ ...body, room: body.room ?? null }).returning({ id: timetableEntries.id });
+    return row;
+  }
+
+  @RequirePermissions('timetable:manage')
+  @Delete(':id')
+  @HttpCode(204)
+  async remove(@Param('id', ParseUUIDPipe) id: string) {
+    await this.db.delete(timetableEntries).where(eq(timetableEntries.id, id));
+  }
+}
+
+@Module({ controllers: [TimetableController] })
+export class TimetableModule {}
