@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "SDA SHS",
+    "slug": "sda-shs",
+    "scheme": "sdashs",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "description": "SDA Senior High School — Learn. Grow. Serve.",
+    "android": {
+      "package": "org.sdashs.app",
+      "adaptiveIcon": { "backgroundColor": "#0c2a59" },
+      "permissions": ["POST_NOTIFICATIONS"],
+      "blockedPermissions": ["android.permission.RECORD_AUDIO", "android.permission.ACCESS_FINE_LOCATION"]
+    },
+    "ios": {
+      "bundleIdentifier": "org.sdashs.app",
+      "supportsTablet": false
+    },
+    "web": { "bundler": "metro", "output": "single" },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      ["expo-notifications", { "color": "#123b7a" }]
+    ],
+    "experiments": { "typedRoutes": false }
+  }
+}

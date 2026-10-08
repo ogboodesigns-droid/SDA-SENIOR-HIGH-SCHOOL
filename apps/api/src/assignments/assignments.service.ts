@@ -234,7 +234,8 @@ export class AssignmentsService {
     const recipients = await this.notifications.studentAndGuardianUserIds([row.sub.studentId]);
     await this.notifications.notify(
       recipients,
-      { type: 'assignment_graded', title: 'Assignment marked', body: `${row.a.title}: ${input.score}/${row.a.maxScore}`, data: { assignmentId: row.a.id } },
+      // Marks stay out of the notification text: it can appear on a lock screen.
+      { type: 'assignment_graded', title: 'Assignment marked', body: `${row.a.title} has been marked. Open the app to see your feedback.`, data: { assignmentId: row.a.id } },
       { push: true },
     );
   }

@@ -1,0 +1,8 @@
+**/node_modules
+**/dist
+**/.next
+**/.expo
+**/uploads
+.git
+.env
+apps/mobile

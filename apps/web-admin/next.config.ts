@@ -1,8 +1,11 @@
+import path from 'node:path';
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   transpilePackages: ['@sda-shs/shared'],
   poweredByHeader: false,
+  output: 'standalone',
+  outputFileTracingRoot: path.join(__dirname, '../..'),
   async headers() {
     return [
       {
