@@ -18,6 +18,7 @@ export const PERMISSIONS = [
   'assignments:manage',
   'results:enter',
   'results:publish',
+  'attendance:take',
   'houses:manage',
   'audit:read',
 ] as const;
@@ -36,6 +37,7 @@ const LEADERSHIP: Permission[] = [
   'assignments:manage',
   'results:enter',
   'results:publish',
+  'attendance:take',
   'houses:manage',
 ];
 
@@ -44,7 +46,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   head: [...LEADERSHIP, 'audit:read'],
   // Assistant heads cannot alter school identity or manage accounts.
   assistant_head: LEADERSHIP.filter((p) => p !== 'school:manage' && p !== 'users:manage'),
-  teacher: ['announcements:publish', 'assignments:manage', 'results:enter'],
+  teacher: ['announcements:publish', 'assignments:manage', 'results:enter', 'attendance:take'],
   accountant: [],
   librarian: [],
   counsellor: [],

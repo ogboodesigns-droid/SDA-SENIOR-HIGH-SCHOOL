@@ -71,8 +71,14 @@ export const NOTIFICATION_TYPES = [
   'result_published',
   'event',
   'system',
+  'attendance',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
+
+/** Daily register marks. Late counts as present; excused is an approved absence. */
+export const ATTENDANCE_STATUSES = ['present', 'late', 'absent', 'excused'] as const;
+export type AttendanceStatus = (typeof ATTENDANCE_STATUSES)[number];
+export const ATTENDANCE_LABELS: Record<AttendanceStatus, string> = { present: 'Present', late: 'Late', absent: 'Absent', excused: 'Excused' };
 
 export const UPLOAD_MIME_TYPES = [
   'application/pdf',

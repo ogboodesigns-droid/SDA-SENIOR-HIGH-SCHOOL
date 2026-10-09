@@ -21,6 +21,7 @@ import {
 import {
   ANNOUNCEMENT_CATEGORIES,
   ANNOUNCEMENT_PRIORITIES,
+  ATTENDANCE_STATUSES,
   AUDIENCE_TYPES,
   EVENT_CATEGORIES,
   NOTIFICATION_TYPES,
@@ -49,6 +50,7 @@ export const audienceTypeEnum = pgEnum('audience_type', AUDIENCE_TYPES);
 export const eventCategoryEnum = pgEnum('event_category', EVENT_CATEGORIES);
 export const submissionStatusEnum = pgEnum('submission_status', SUBMISSION_STATUSES);
 export const notificationTypeEnum = pgEnum('notification_type', NOTIFICATION_TYPES);
+export const attendanceStatusEnum = pgEnum('attendance_status', ATTENDANCE_STATUSES);
 
 // ── Identity ────────────────────────────────────────────────────────────────
 
@@ -560,6 +562,29 @@ export const results = pgTable(
     uniqueIndex('results_student_subject_term').on(t.studentId, t.subjectId, t.termId),
     index('results_class_term_idx').on(t.classId, t.termId),
   ],
+);
+
+/** The daily register: one mark per student per school day. */
+export const attendanceRecords = pgTable(
+  'attendance_records',
+  {
+    id: id(),
+    studentId: uuid('student_id')
+      .notNull()
+      .references(() => students.id, { onDelete: 'cascade' }),
+    /** Class the student was in that day (students move between classes). */
+    classId: uuid('class_id')
+      .notNull()
+      .references(() => classes.id, { onDelete: 'restrict' }),
+    date: date('date').notNull(),
+    status: attendanceStatusEnum('status').notNull(),
+    note: text('note'),
+    recordedBy: uuid('recorded_by')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex('attendance_student_date').on(t.studentId, t.date), index('attendance_class_date_idx').on(t.classId, t.date)],
 );
 
 /** Report card remarks for a student in a semester, written by the form master and the head. */

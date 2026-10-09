@@ -29,6 +29,7 @@ import {
 import type { AuthUser } from '../common/auth-user';
 import { AuditService } from '../common/audit.service';
 import { AccessService } from '../access/access.service';
+import { AttendanceService, attendanceCounts } from '../attendance/attendance.service';
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 const NO_REMARKS: ReportRemarks = { conduct: null, attitude: null, interest: null, formMasterRemark: null, headRemark: null };
@@ -44,6 +45,7 @@ export class ReportsService {
     @InjectDb() private readonly db: Database,
     private readonly access: AccessService,
     private readonly audit: AuditService,
+    private readonly attendance: AttendanceService,
   ) {}
 
   /** May this user see drafts of, and write remarks on, this class's reports? */
@@ -107,7 +109,7 @@ export class ReportsService {
   private async build(termId: string, studentIds: string[], includeUnpublished: boolean): Promise<ReportCard[]> {
     if (!studentIds.length) return [];
     const [term] = await this.db
-      .select({ id: terms.id, name: terms.name, semester: terms.semester, endsOn: terms.endsOn, academicYearName: academicYears.name })
+      .select({ id: terms.id, name: terms.name, semester: terms.semester, startsOn: terms.startsOn, endsOn: terms.endsOn, academicYearName: academicYears.name })
       .from(terms)
       .innerJoin(academicYears, eq(academicYears.id, terms.academicYearId))
       .where(eq(terms.id, termId));
@@ -163,6 +165,8 @@ export class ReportsService {
       .where(and(eq(reportRemarks.termId, termId), inArray(reportRemarks.studentId, studentIds)));
     const remarksBy = new Map(remarkRows.map((r) => [r.studentId, r]));
 
+    const attendanceBy = await this.attendance.statusesFor(studentIds, term);
+
     const best3 = (points: number[]) => (points.length < 3 ? null : [...points].sort((a, b) => a - b).slice(0, 3).reduce((a, b) => a + b, 0));
 
     return people.flatMap((p) => {
@@ -188,6 +192,7 @@ export class ReportsService {
       const elective = best3(subjectRows.filter((s) => !s.isCore).map((s) => s.gradePoint));
       const totalMarks = round2(subjectRows.reduce((sum, s) => sum + s.total, 0));
       const rm = remarksBy.get(p.id);
+      const att = attendanceCounts(attendanceBy.get(p.id) ?? []);
       return [
         {
           school: {
@@ -228,6 +233,7 @@ export class ReportsService {
             aggregate: core !== null && elective !== null ? core + elective : null,
             totalMarks,
           },
+          attendance: att.days ? { attended: att.present + att.late, days: att.days } : null,
           remarks: rm
             ? { conduct: rm.conduct, attitude: rm.attitude, interest: rm.interest, formMasterRemark: rm.formMasterRemark, headRemark: rm.headRemark }
             : NO_REMARKS,

@@ -141,6 +141,9 @@ export function ReportCardView({ card }: { card: ReportCard }) {
       <div className="rc-remarks">
         <div className="rc-traits">
           <span>
+            Attendance: <strong>{card.attendance ? `${card.attendance.attended} out of ${card.attendance.days} days` : '—'}</strong>
+          </span>
+          <span>
             Conduct: <strong>{dash(remarks.conduct)}</strong>
           </span>
           <span>

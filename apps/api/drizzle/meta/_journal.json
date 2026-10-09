@@ -71,6 +71,13 @@
       "when": 1791523041596,
       "tag": "0009_report_remarks",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791523431744,
+      "tag": "0010_attendance",
+      "breakpoints": true
     }
   ]
 }

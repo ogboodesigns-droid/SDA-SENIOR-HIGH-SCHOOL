@@ -35,6 +35,7 @@ function Gate() {
       <Stack.Screen name="change-password" options={{ title: 'New password', headerBackVisible: false }} />
       <Stack.Screen name="timetable" options={{ title: 'Timetable' }} />
       <Stack.Screen name="results" options={{ title: 'My Results' }} />
+      <Stack.Screen name="attendance" options={{ title: 'Attendance' }} />
       <Stack.Screen name="subjects" options={{ title: 'My Subjects' }} />
       <Stack.Screen name="assignments/index" options={{ title: 'Assignments' }} />
       <Stack.Screen name="assignments/[id]" options={{ title: 'Assignment' }} />

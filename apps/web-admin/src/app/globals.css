@@ -181,3 +181,11 @@ td input { min-width: 70px; }
   .report-card:last-child { break-after: auto; }
 }
 @media (max-width: 700px) { .rc-info { grid-template-columns: repeat(2, 1fr); } }
+
+/* Attendance register: one tap per student */
+.att-marks { display: flex; gap: 4px; flex-wrap: wrap; }
+.att-mark { background: #fff; color: var(--text, #1d2433); border: 1px solid var(--border); padding: 4px 10px; font-weight: 600; font-size: .82rem; }
+.att-mark.on.att-present { background: #e3f3e8; border-color: var(--ok); color: var(--ok); }
+.att-mark.on.att-late { background: #fdf1d8; border-color: var(--warn); color: var(--warn); }
+.att-mark.on.att-absent { background: #fbe4e2; border-color: var(--danger); color: var(--danger); }
+.att-mark.on.att-excused { background: #f8e6f0; border-color: var(--brand); color: var(--brand); }

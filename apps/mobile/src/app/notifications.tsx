@@ -15,6 +15,7 @@ export default function NotificationsScreen() {
     if (n.data?.assignmentId) router.push(`/assignments/${n.data.assignmentId}`);
     else if (n.data?.announcementId) router.push(`/announcements/${n.data.announcementId}`);
     else if (n.type === 'result_published') router.push('/results');
+    else if (n.type === 'attendance') router.push('/attendance');
   }
 
   return (

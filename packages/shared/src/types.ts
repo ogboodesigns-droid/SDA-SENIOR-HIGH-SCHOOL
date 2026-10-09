@@ -3,6 +3,7 @@ import type { Permission } from './permissions';
 import type {
   AnnouncementCategory,
   AnnouncementPriority,
+  AttendanceStatus,
   AudienceType,
   EventCategory,
   NotificationType,
@@ -427,7 +428,56 @@ export interface ReportCard {
   components: { key: string; label: string; weight: number }[];
   subjects: ReportCardSubject[];
   summary: { subjects: number; average: number | null; gpa: number | null; aggregate: number | null; totalMarks: number };
+  /** Days present (including late) out of days the register recorded the student this semester. */
+  attendance: { attended: number; days: number } | null;
   remarks: ReportRemarks;
   /** True when some marks shown are not yet published (staff preview only). */
   draft: boolean;
+}
+
+export interface AttendanceCounts {
+  present: number;
+  late: number;
+  absent: number;
+  excused: number;
+  /** Days the register recorded the student. */
+  days: number;
+  /** Present or late, as a percentage of `days` (null before any register). */
+  percentage: number | null;
+}
+
+/** A class's register for one day. */
+export interface AttendanceRegister {
+  classId: string;
+  className: string;
+  date: string;
+  /** Someone has already marked this day's register. */
+  taken: boolean;
+  takenBy: string | null;
+  students: { studentId: string; fullName: string; studentNumber: string; groupName: string; status: AttendanceStatus | null; note: string | null }[];
+}
+
+export interface AttendanceSummaryRow extends AttendanceCounts {
+  studentId: string;
+  fullName: string;
+  studentNumber: string;
+}
+
+/** A student's attendance for a semester, for the student and their parents. */
+export interface MyAttendance {
+  termId: string;
+  termName: string;
+  counts: AttendanceCounts;
+  /** Days not marked present, newest first. */
+  exceptions: { date: string; status: AttendanceStatus; note: string | null }[];
+}
+
+/** Which registers have been taken on a day (school leadership). */
+export interface AttendanceOverviewRow {
+  classId: string;
+  className: string;
+  students: number;
+  marked: number;
+  absent: number;
+  late: number;
 }

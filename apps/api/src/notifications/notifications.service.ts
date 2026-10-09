@@ -82,6 +82,16 @@ export class NotificationsService {
     return this.onlyActive([...new Set(rows.flatMap((r) => (r.guardianId ? [r.userId, r.guardianId] : [r.userId])))]);
   }
 
+  /** Active parent/guardian accounts linked to these students. */
+  async guardianUserIds(studentIds: string[]): Promise<string[]> {
+    if (!studentIds.length) return [];
+    const rows = await this.db
+      .select({ id: guardianStudents.guardianUserId })
+      .from(guardianStudents)
+      .where(inArray(guardianStudents.studentId, studentIds));
+    return this.onlyActive([...new Set(rows.map((r) => r.id))]);
+  }
+
   private async onlyActive(ids: string[]): Promise<string[]> {
     if (!ids.length) return [];
     const rows = await this.db.select({ id: users.id }).from(users).where(and(inArray(users.id, ids), eq(users.status, 'active')));

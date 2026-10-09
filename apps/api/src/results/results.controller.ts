@@ -14,6 +14,7 @@ import { clientIp, CurrentUser, RequirePermissions } from '../common/decorators'
 import { ZodPipe } from '../common/zod.pipe';
 import { AuditService } from '../common/audit.service';
 import { ResultsService } from './results.service';
+import { AttendanceModule } from '../attendance/attendance.controller';
 import { ReportsService } from './reports.service';
 import { TranscriptService } from './transcript.service';
 
@@ -97,5 +98,5 @@ export class ReportsController {
   }
 }
 
-@Module({ controllers: [ResultsController, ReportsController], providers: [ResultsService, TranscriptService, ReportsService], exports: [ResultsService] })
+@Module({ imports: [AttendanceModule], controllers: [ResultsController, ReportsController], providers: [ResultsService, TranscriptService, ReportsService], exports: [ResultsService] })
 export class ResultsModule {}

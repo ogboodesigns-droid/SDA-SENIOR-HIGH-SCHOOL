@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { ROLES } from './roles';
 import {
+  ATTENDANCE_STATUSES,
   ANNOUNCEMENT_CATEGORIES,
   ANNOUNCEMENT_PRIORITIES,
   AUDIENCE_TYPES,
@@ -440,3 +441,14 @@ export const reportRemarksSchema = z.object({
   headRemark: remarkText(400).optional(),
 });
 export type ReportRemarksInput = z.infer<typeof reportRemarksSchema>;
+
+/** A class's register for one day; students left out are left as they were. */
+export const attendanceRegisterSchema = z.object({
+  classId: z.uuid(),
+  date: isoDate,
+  entries: z
+    .array(z.object({ studentId: z.uuid(), status: z.enum(ATTENDANCE_STATUSES), note: z.string().trim().max(200).nullish() }))
+    .min(1)
+    .max(300),
+});
+export type AttendanceRegisterInput = z.infer<typeof attendanceRegisterSchema>;

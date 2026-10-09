@@ -12,6 +12,7 @@ import { Badge, Body, Card, Empty, ErrorNote, Screen, SectionTitle, Title } from
 const QUICK: { label: string; icon: keyof typeof Ionicons.glyphMap; href: Href; roles?: string[] }[] = [
   { label: 'Timetable', icon: 'time-outline', href: '/timetable', roles: ['student', 'parent', 'teacher'] },
   { label: 'Results', icon: 'ribbon-outline', href: '/results', roles: ['student', 'parent'] },
+  { label: 'Attendance', icon: 'checkmark-done-outline', href: '/attendance', roles: ['student', 'parent'] },
   { label: 'Assignments', icon: 'clipboard-outline', href: '/assignments', roles: ['student', 'parent', 'teacher', 'head', 'assistant_head', 'super_admin'] },
   { label: 'Subjects', icon: 'book-outline', href: '/subjects', roles: ['student', 'parent'] },
   { label: 'News', icon: 'megaphone-outline', href: '/updates' },

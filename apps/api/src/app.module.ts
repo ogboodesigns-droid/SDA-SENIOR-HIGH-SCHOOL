@@ -19,6 +19,7 @@ import { classes, users } from './database/schema';
 import { EventsModule } from './events/events.controller';
 import { FilesModule } from './files/files.controller';
 import { NotificationsModule } from './notifications/notifications.controller';
+import { AttendanceModule } from './attendance/attendance.controller';
 import { ResultsModule } from './results/results.controller';
 import { SchoolModule } from './school/school.controller';
 import { TimetableModule } from './timetable/timetable.controller';
@@ -61,6 +62,7 @@ class HealthController {
     CurriculumModule,
     AuthModule,
     NotificationsModule,
+    AttendanceModule,
     FilesModule,
     UsersModule,
     SchoolModule,
