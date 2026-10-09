@@ -1,9 +1,10 @@
 'use client';
 
 import { use, useState } from 'react';
-import { ROLE_LABELS, textOn, type House, type Me, type Paginated, type SubjectChoice, type SubjectCombination, type UserListItem } from '@sda-shs/shared';
+import { isLeadership, ROLE_LABELS, textOn, type House, type Me, type Paginated, type SubjectChoice, type SubjectCombination, type UserListItem } from '@sda-shs/shared';
 import { api, formatDate, useApi } from '@/lib/api';
-import { useCan } from '@/lib/me';
+import Link from 'next/link';
+import { useCan, useMe } from '@/lib/me';
 import { Alert, Card, Field, Loading, PageHeader, useSubmit } from '@/components/ui';
 
 interface UserDetail extends Me {
@@ -35,6 +36,7 @@ const REGISTRATION: [RegistrationKey, string][] = [
 ];
 type RegistrationKey =
   | 'beceIndexNo'
+  | 'assessmentRefId'
   | 'gender'
   | 'dateOfBirth'
   | 'nationality'
@@ -53,6 +55,7 @@ type RegistrationKey =
 export default function UserDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const canManage = useCan('users:manage');
+  const me = useMe();
   const user = useApi<UserDetail>(`/users/${id}`);
   const classes = useApi<{ id: string; name: string; programmeId: string; stream: number | null }[]>(user.data?.role === 'student' ? '/classes' : null);
   const houses = useApi<House[]>(user.data?.role === 'student' ? '/houses' : null);
@@ -102,7 +105,13 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
         title={u.fullName}
         description={`${ROLE_LABELS[u.role]} · created ${formatDate(u.createdAt)} · last sign-in ${formatDate(u.lastLoginAt, true)}`}
         actions={
-          canManage && (
+          <>
+            {u.student && isLeadership(me.role) && (
+              <Link href={`/users/${id}/transcript`} className="button secondary">
+                Transcript
+              </Link>
+            )}
+            {canManage && (
             <button
               className={u.status === 'active' ? 'danger' : ''}
               onClick={() =>
@@ -114,7 +123,8 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
             >
               {u.status === 'active' ? 'Deactivate account' : 'Reactivate account'}
             </button>
-          )
+            )}
+          </>
         }
       />
       <Alert>{error}</Alert>
@@ -274,6 +284,25 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
       {u.registration && (
         <Card title="Registration">
           <div className="grid">
+            <div>
+              <div className="field-label">Ass&apos;t Ref ID (transcript)</div>
+              {canManage ? (
+                <input
+                  defaultValue={u.registration.assessmentRefId ?? ''}
+                  placeholder="e.g. 24002010912E"
+                  aria-label="Assessment reference ID"
+                  onBlur={(e) =>
+                    e.target.value.trim() !== (u.registration!.assessmentRefId ?? '') &&
+                    act(
+                      () => api(`/users/${id}`, { method: 'PATCH', body: { assessmentRefId: e.target.value.trim() || null } }),
+                      'Assessment reference ID saved.',
+                    )
+                  }
+                />
+              ) : (
+                (u.registration.assessmentRefId ?? '—')
+              )}
+            </div>
             {REGISTRATION.map(([key, label]) => {
               const v = u.registration![key];
               return (

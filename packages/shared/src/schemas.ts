@@ -96,6 +96,13 @@ export const updateUserSchema = z.object({
   houseId: uuid.nullish(),
   /** The elective the student doesn't take (one of a clashing pair, or dropped before SHS 3). */
   droppedSubjectId: uuid.nullish(),
+  /** "Ass't Ref ID" printed on the student's transcript. */
+  assessmentRefId: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .regex(/^[A-Z0-9/-]{4,30}$/, 'Letters and numbers only, e.g. 24002010912E')
+    .nullish(),
 });
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
 
@@ -130,6 +137,8 @@ export const schoolProfileSchema = z.object({
   address: optionalText(400),
   phone: optionalText(40),
   email: z.email().nullish(),
+  /** Ghana Post GPS digital address, e.g. EN-135-1605. */
+  gpsAddress: optionalText(20),
   website: z.url().nullish(),
   logoUrl: z.url().nullish(),
 });
@@ -138,9 +147,19 @@ export type SchoolProfileInput = z.infer<typeof schoolProfileSchema>;
 export const gradingScaleSchema = z
   .object({
     bands: z
-      .array(z.object({ min: z.number().min(0).max(100), grade: trimmed(4), points: z.number().int().min(1).max(9), remark: trimmed(40) }))
+      .array(
+        z.object({
+          min: z.number().min(0).max(100),
+          grade: trimmed(4),
+          points: z.number().int().min(1).max(9),
+          gpa: z.number().min(0).max(5).default(0),
+          remark: trimmed(40),
+        }),
+      )
       .min(2)
       .max(15),
+    /** Transcript credits for each subject passed in a semester. */
+    creditsPerSubject: z.number().min(0).max(100).default(10),
   })
   .refine((v) => v.bands.some((b) => b.min === 0), 'One band must start at 0');
 export type GradingScaleInput = z.infer<typeof gradingScaleSchema>;

@@ -246,7 +246,7 @@ function Results() {
         title="Results"
         description={
           components.length
-            ? `Marks per assessment: ${components.map((c) => `${shortLabel(c)} /${c.weight}`).join(' · ')}. Graded on the WASSCE scale. Marks can be entered through the semester; only complete results can be published.`
+            ? `Marks per assessment: ${components.map((c) => `${shortLabel(c)} /${c.weight}`).join(' · ')}. Graded on the school's scale (A1 80–100 … F9 0–39). Marks can be entered through the semester; only complete results can be published.`
             : undefined
         }
       />

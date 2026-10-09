@@ -88,6 +88,7 @@ export interface SchoolProfile {
   address: string | null;
   phone: string | null;
   email: string | null;
+  gpsAddress: string | null;
   website: string | null;
   logoUrl: string | null;
   updatedAt: string | null;
@@ -347,4 +348,39 @@ export interface GradeImportReport {
   rows: GradeImportRow[];
   errors: ImportIssue[];
   saved: number;
+}
+
+/** One subject's line in a year of the official transcript. */
+export interface TranscriptCourse {
+  subjectName: string;
+  /** Per semester (index 0 = Semester 1): GPA points and final grade, or null when there is no published result. */
+  semesters: [{ gpa: number; grade: string } | null, { gpa: number; grade: string } | null];
+}
+
+export interface TranscriptYear {
+  /** 1, 2, 3: counted from the year of admission. */
+  year: number;
+  academicYearName: string;
+  courses: TranscriptCourse[];
+}
+
+/** The official transcript, built from published results only. */
+export interface Transcript {
+  school: { name: string; address: string | null; phone: string | null; email: string | null; gpsAddress: string | null; logoUrl: string | null };
+  student: {
+    id: string;
+    name: string;
+    admissionNo: string;
+    studyArea: string;
+    dateOfBirth: string | null;
+    yearOfAdmission: number | null;
+    assessmentRefId: string | null;
+  };
+  years: TranscriptYear[];
+  cumulativeGpa: number | null;
+  creditsEarned: number;
+  creditsPerSubject: number;
+  /** Highest band first, with the score range each grade covers. */
+  gradeInterpretation: { grade: string; gpa: number; min: number; max: number; remark: string }[];
+  generatedAt: string;
 }

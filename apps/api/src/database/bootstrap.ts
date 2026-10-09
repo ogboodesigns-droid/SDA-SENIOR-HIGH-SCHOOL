@@ -19,12 +19,15 @@ import { DEFAULT_ASSESSMENT_SCHEMES, DEFAULT_BELL_SCHEDULE, DEFAULT_GRADING_SCAL
 import { loadSchoolCatalogue } from './school-catalogue';
 import * as schema from './schema';
 
-/** As shown on the school crest and supplied by the school. */
+/** As shown on the school crest and supplied by the school (contacts as on its official transcript). */
 const SCHOOL = {
   name: 'S.D.A Senior High School, Asokore-Koforidua',
   shortName: 'SDA SHS',
   motto: 'Knowledge for Excellence',
   address: 'P. O. Box 18, Asokore - Koforidua',
+  phone: '0208188483',
+  email: 'sdaseniorhigh.ask@gmail.com',
+  gpsAddress: 'EN-135-1605',
 };
 
 function required(name: string): string {
@@ -45,6 +48,9 @@ async function main() {
         shortName: SCHOOL.shortName,
         motto: process.env.SCHOOL_MOTTO?.trim() || SCHOOL.motto,
         address: process.env.SCHOOL_ADDRESS?.trim() || SCHOOL.address,
+        phone: SCHOOL.phone,
+        email: SCHOOL.email,
+        gpsAddress: SCHOOL.gpsAddress,
         gradingScale: { bands: DEFAULT_GRADING_SCALE },
         assessmentSchemes: DEFAULT_ASSESSMENT_SCHEMES,
         bellSchedule: DEFAULT_BELL_SCHEDULE,

@@ -5,14 +5,30 @@ import type { Request } from 'express';
 import type { AuthUser } from '../common/auth-user';
 import { clientIp, CurrentUser, RequirePermissions } from '../common/decorators';
 import { ZodPipe } from '../common/zod.pipe';
+import { AuditService } from '../common/audit.service';
 import { ResultsService } from './results.service';
+import { TranscriptService } from './transcript.service';
 
 const sheetQuery = z.object({ termId: z.uuid(), classId: z.uuid(), subjectId: z.uuid() });
 const optionalUuid = z.uuid().optional();
 
 @Controller('results')
 export class ResultsController {
-  constructor(private readonly service: ResultsService) {}
+  constructor(
+    private readonly service: ResultsService,
+    private readonly transcripts: TranscriptService,
+    private readonly audit: AuditService,
+  ) {}
+
+  /** The official transcript (published results only). */
+  @Get('transcript/:studentId')
+  async transcript(@CurrentUser() user: AuthUser, @Param('studentId', ParseUUIDPipe) studentId: string, @Req() req: Request) {
+    const transcript = await this.transcripts.build(user, studentId);
+    if (user.role !== 'student' && user.role !== 'parent') {
+      await this.audit.record({ actorId: user.id, action: 'transcript.issued', entityType: 'student', entityId: studentId, ip: clientIp(req) });
+    }
+    return transcript;
+  }
 
   @Get('mine')
   mine(@CurrentUser() user: AuthUser, @Query('studentId', new ZodPipe(optionalUuid)) studentId?: string, @Query('termId', new ZodPipe(optionalUuid)) termId?: string) {
@@ -44,5 +60,5 @@ export class ResultsController {
   }
 }
 
-@Module({ controllers: [ResultsController], providers: [ResultsService], exports: [ResultsService] })
+@Module({ controllers: [ResultsController], providers: [ResultsService, TranscriptService], exports: [ResultsService] })
 export class ResultsModule {}

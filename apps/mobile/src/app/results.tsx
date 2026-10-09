@@ -8,7 +8,7 @@ import { Badge, Body, Card, Empty, ErrorNote, Loading, Screen, SectionTitle, Tit
 
 interface ResultsResponse {
   rows: ResultRow[];
-  terms: { termId: string; termName: string; subjects: number; average: number; aggregate: number | null }[];
+  terms: { termId: string; termName: string; subjects: number; average: number; aggregate: number | null; gpa: number }[];
 }
 
 function gradeTone(points: number): 'ok' | 'brand' | 'warn' | 'danger' {
@@ -31,7 +31,9 @@ export default function ResultsScreen() {
         <View key={t.termId} style={{ gap: 8 }}>
           <SectionTitle>{t.termName}</SectionTitle>
           <Card>
-            <Title>Average: {t.average}%</Title>
+            <Title>
+              GPA {t.gpa.toFixed(1)} · Average {t.average}%
+            </Title>
             <Body muted>
               {t.subjects} subject{t.subjects === 1 ? '' : 's'}
             </Body>

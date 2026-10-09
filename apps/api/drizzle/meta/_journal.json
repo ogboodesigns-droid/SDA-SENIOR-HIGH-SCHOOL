@@ -50,6 +50,20 @@
       "when": 1791517117175,
       "tag": "0006_house_colours",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791517574002,
+      "tag": "0007_official_grading_scale",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791517656055,
+      "tag": "0008_transcript_details",
+      "breakpoints": true
     }
   ]
 }

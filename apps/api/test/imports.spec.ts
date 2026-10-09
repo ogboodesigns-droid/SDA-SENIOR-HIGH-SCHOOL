@@ -181,7 +181,7 @@ describe('bulk imports', () => {
         ...Array.from({ length: 4 }, () => expect.stringMatching(/is not a registered student$/)),
       ]);
       const first = preview.body.rows[0];
-      expect(first).toMatchObject({ admissionNo: 'SDA/24/0001', total: 77, grade: 'A1', complete: true });
+      expect(first).toMatchObject({ admissionNo: 'SDA/24/0001', total: 77, grade: 'B2', complete: true });
       expect(preview.body.rows[2]).toMatchObject({ complete: false, grade: null });
 
       const saved = await uploadGrades(await save(wb), 'dryRun=false').expect(201);

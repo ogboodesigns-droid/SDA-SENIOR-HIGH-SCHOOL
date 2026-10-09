@@ -132,9 +132,10 @@ export const schoolProfile = pgTable('school_profile', {
   address: text('address'),
   phone: text('phone'),
   email: text('email'),
+  gpsAddress: text('gps_address'),
   website: text('website'),
   logoUrl: text('logo_url'),
-  gradingScale: jsonb('grading_scale').$type<{ bands: GradeBand[] }>(),
+  gradingScale: jsonb('grading_scale').$type<{ bands: GradeBand[]; creditsPerSubject?: number }>(),
   /** Assessment components and weights for semester 1 and semester 2. */
   assessmentSchemes: jsonb('assessment_schemes').$type<AssessmentSchemes>(),
   /** Periods, breaks and school-wide activities of the school day. */
@@ -305,6 +306,8 @@ export const students = pgTable(
     studentNumber: text('student_number').notNull().unique(),
     /** BECE index number: 10 digits, unique per student; used to detect duplicate registrations. */
     beceIndexNo: text('bece_index_no').unique(),
+    /** "Ass't Ref ID" printed on the official transcript (e.g. 24002010912E). */
+    assessmentRefId: text('assessment_ref_id').unique(),
     surname: text('surname'),
     firstName: text('first_name'),
     otherNames: text('other_names'),

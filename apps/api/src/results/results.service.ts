@@ -3,7 +3,9 @@ import { and, asc, desc, eq, inArray, isNotNull, isNull, type SQL } from 'drizzl
 import {
   DEFAULT_ASSESSMENT_SCHEMES,
   DEFAULT_GRADING_SCALE,
+  gpaFor,
   gradeFor,
+  roundGpa,
   summariseScores,
   type AssessmentComponent,
   type AssessmentSchemes,
@@ -227,7 +229,7 @@ export class ResultsService {
   /** A student's (or parent's child's) published results. */
   async mine(user: AuthUser, studentId?: string, termId?: string) {
     const student = await this.access.resolveOwnStudent(user, studentId);
-    return this.withSummary(
+    return await this.withSummary(
       await this.rows(and(eq(results.studentId, student.id), isNotNull(results.publishedAt), termId ? eq(results.termId, termId) : undefined)),
     );
   }
@@ -236,15 +238,17 @@ export class ResultsService {
   async forStudent(user: AuthUser, studentId: string, termId?: string) {
     if (user.role === 'student' || user.role === 'parent') return this.mine(user, studentId, termId);
     await this.access.assertCanReadStudent(user, studentId);
-    return this.withSummary(await this.rows(and(eq(results.studentId, studentId), termId ? eq(results.termId, termId) : undefined)));
+    return await this.withSummary(await this.rows(and(eq(results.studentId, studentId), termId ? eq(results.termId, termId) : undefined)));
   }
 
   /**
    * Per-term average, plus the WASSCE-style aggregate: the sum of grade points
    * of the best three core and best three elective subjects (6 is the best
-   * possible). Null until a term has at least three of each.
+   * possible). Null until a term has at least three of each. The GPA is the
+   * average of the subjects' GPA points (4.0 scale), as on the transcript.
    */
-  private withSummary(rows: (ResultRow & { isCore: boolean })[]) {
+  private async withSummary(rows: (ResultRow & { isCore: boolean })[]) {
+    const { bands } = await this.settings();
     const byTerm = new Map<string, { termId: string; termName: string; rows: typeof rows }>();
     for (const r of rows) {
       const t = byTerm.get(r.termId) ?? { termId: r.termId, termName: r.termName, rows: [] };
@@ -263,6 +267,7 @@ export class ResultsService {
           subjects: t.rows.length,
           average: round2(t.rows.reduce((sum, r) => sum + r.total, 0) / t.rows.length),
           aggregate: core !== null && elective !== null ? core + elective : null,
+          gpa: roundGpa(t.rows.reduce((sum, r) => sum + gpaFor(r.grade, bands), 0) / t.rows.length),
         };
       }),
     };

@@ -105,6 +105,7 @@ export class UsersService {
       ? await this.db
           .select({
             beceIndexNo: students.beceIndexNo,
+            assessmentRefId: students.assessmentRefId,
             gender: students.gender,
             dateOfBirth: students.dateOfBirth,
             nationality: students.nationality,
@@ -183,8 +184,9 @@ export class UsersService {
     if (id === actor.id && input.status === 'deactivated') {
       throw new BadRequestException('You cannot deactivate your own account');
     }
-    const { classId, combinationId, houseId, droppedSubjectId, ...fields } = input;
-    const studentChanges = classId !== undefined || combinationId !== undefined || houseId !== undefined || droppedSubjectId !== undefined;
+    const { classId, combinationId, houseId, droppedSubjectId, assessmentRefId, ...fields } = input;
+    const studentChanges =
+      classId !== undefined || combinationId !== undefined || houseId !== undefined || droppedSubjectId !== undefined || assessmentRefId !== undefined;
     if (studentChanges) {
       const [student] = await this.db.select().from(students).where(eq(students.userId, id));
       if (!student) throw new BadRequestException('Only students have a class, option or house');
@@ -203,6 +205,7 @@ export class UsersService {
           classId: targetClass,
           combinationId: targetCombination,
           houseId: houseId === undefined ? student.houseId : houseId,
+          assessmentRefId: assessmentRefId === undefined ? student.assessmentRefId : (assessmentRefId ?? null),
           droppedSubjectId: optionChanged ? null : student.droppedSubjectId,
         })
         .where(eq(students.id, student.id));

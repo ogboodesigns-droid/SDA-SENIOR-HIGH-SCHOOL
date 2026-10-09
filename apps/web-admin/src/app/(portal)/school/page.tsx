@@ -20,6 +20,7 @@ function ProfileForm({ profile, onSaved }: { profile: SchoolProfile; onSaved: ()
         address: blankToNull(v.address),
         phone: blankToNull(v.phone),
         email: blankToNull(v.email),
+        gpsAddress: blankToNull(v.gpsAddress),
         website: blankToNull(v.website),
         logoUrl: blankToNull(v.logoUrl),
       },
@@ -45,6 +46,9 @@ function ProfileForm({ profile, onSaved }: { profile: SchoolProfile; onSaved: ()
         </Field>
         <Field label="Email">
           <input name="email" type="email" defaultValue={profile.email ?? ''} />
+        </Field>
+        <Field label="GPS address" hint="Ghana Post digital address">
+          <input name="gpsAddress" defaultValue={profile.gpsAddress ?? ''} placeholder="EN-135-1605" />
         </Field>
         <Field label="Website">
           <input name="website" type="url" defaultValue={profile.website ?? ''} />
@@ -85,22 +89,26 @@ function GradingScale() {
     if (!draft) return;
     await api('/school/grading-scale', { method: 'PUT', body: draft });
     await scale.reload();
-    return 'Grading scale saved. It applies to results entered from now on.';
+    return 'Grading scale saved. Results not yet published have been regraded; published results keep the grades already issued.';
   });
   if (!draft) return <Loading />;
 
-  const setBand = (i: number, key: 'min' | 'grade' | 'points' | 'remark', value: string) =>
-    setDraft({ ...draft, bands: draft.bands.map((b, j) => (j === i ? { ...b, [key]: key === 'min' || key === 'points' ? Number(value) : value } : b)) });
+  const setBand = (i: number, key: 'min' | 'grade' | 'points' | 'gpa' | 'remark', value: string) =>
+    setDraft({ ...draft, bands: draft.bands.map((b, j) => (j === i ? { ...b, [key]: key === 'grade' || key === 'remark' ? value : Number(value) } : b)) });
 
   return (
     <form className="stack" onSubmit={save.onSubmit}>
-      <Alert kind="info">The WASSCE grading scale (A1 = 1 … F9 = 9). Grade points are used for the aggregate of the best three core and three elective subjects.</Alert>
+      <Alert kind="info">
+        The school&apos;s grading scale. Grade points (A1 = 1 … F9 = 9) give the aggregate of the best three core and three elective subjects; GPA points (A1 = 4.0
+        … F9 = 0.0) give the semester and cumulative GPA on the transcript.
+      </Alert>
       <table>
         <thead>
           <tr>
             <th>From (total ≥)</th>
             <th>Grade</th>
             <th>Points</th>
+            <th>GPA</th>
             <th>Remark</th>
             <th />
           </tr>
@@ -118,6 +126,9 @@ function GradingScale() {
                 <input type="number" min={1} max={9} value={b.points} onChange={(e) => setBand(i, 'points', e.target.value)} aria-label="Grade points" />
               </td>
               <td>
+                <input type="number" min={0} max={5} step={0.1} value={b.gpa} onChange={(e) => setBand(i, 'gpa', e.target.value)} aria-label="GPA points" />
+              </td>
+              <td>
                 <input value={b.remark} onChange={(e) => setBand(i, 'remark', e.target.value)} aria-label="Remark" />
               </td>
               <td>
@@ -129,8 +140,18 @@ function GradingScale() {
           ))}
         </tbody>
       </table>
+      <Field label="Transcript credits per subject passed" hint="Credits earned each semester for every subject graded above the lowest band (F9)">
+        <input
+          type="number"
+          min={0}
+          max={100}
+          value={draft.creditsPerSubject}
+          onChange={(e) => setDraft({ ...draft, creditsPerSubject: Number(e.target.value) })}
+          style={{ maxWidth: 120 }}
+        />
+      </Field>
       <div className="row">
-        <button type="button" className="secondary" onClick={() => setDraft({ ...draft, bands: [...draft.bands, { min: 0, grade: '', points: 9, remark: '' }] })}>
+        <button type="button" className="secondary" onClick={() => setDraft({ ...draft, bands: [...draft.bands, { min: 0, grade: '', points: 9, gpa: 0, remark: '' }] })}>
           Add band
         </button>
         <button disabled={save.busy}>Save grading scale</button>

@@ -18,6 +18,7 @@ The product specification is split into three releases. V1 is built in this repo
 | Assignments (§9) | ✅ | Text and file submissions, late flag, marking with feedback |
 | Results (§10) | ✅ | Marks per assessment mode (15/15/10/20/40), WASSCE grade and grade point, remark, comment, publish workflow (complete results only), semester average and aggregate. *Class position* is not computed until the school confirms its policy |
 | Bulk import (from V2) | ✅ | Student registration sheet with SDA/YY/NNNN admission numbers, guardian accounts, printable sign-in slips; score sheet download/upload |
+| Official transcript (§10) | ✅ | School layout with semester GPA and grade per subject, cumulative GPA, credits earned, grade interpretation; printable |
 | School calendar (§16) | ✅ | Audience-targeted events |
 | Push notifications (§28) | ✅ | Expo push; targeted by school, role, form, programme, class, student and guardians |
 | Admin dashboard (§29) | ✅ (V1 scope) | People, classes & subjects, timetable, announcements, calendar, assignments, results, school profile, audit log |
@@ -50,7 +51,7 @@ The product specification is split into three releases. V1 is built in this repo
 ## Information the school needs to provide
 
 - ~~Official name, logo, motto, address~~ ✅ provided. Still needed: vision, mission, core values, history, phone/email and leadership
-- ~~Grading scale and assessment modes~~ ✅ WASSCE; 15/15/10/20/40. Still needed: whether class positions are published, and which scale is official — the WASSCE table given (A1 75–100), the score sheet template (A1 80–100, B3 65–69) or the transcript (A1 80–100 with a 4.0 GPA). The scale is editable under School profile
+- ~~Grading scale and assessment modes~~ ✅ the score sheet's scale (A1 80–100) with the transcript's 4.0 GPA points; 15/15/10/20/40. Still needed: whether class positions are published, and what the transcript's "qualitative assessment" contains
 - ~~Houses~~ ✅ Gye Nyame (green), Asokore (red), Agyei Sarfo (blue), Kuma Korante (yellow). Optional: house masters/mistresses
 - ~~Programme codes, options, subjects, classes per form~~ ✅ (same classes and options for SHS 1–3; Languages written "1 LANG 1A")
 - Teacher accounts for the staff on the timetables, so they can be assigned to class subjects (`db:sample-timetables` prints the list)

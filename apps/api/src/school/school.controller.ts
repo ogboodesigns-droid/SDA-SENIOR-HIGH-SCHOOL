@@ -6,6 +6,7 @@ import {
   DEFAULT_ASSESSMENT_SCHEMES,
   DEFAULT_BELL_SCHEDULE,
   type BellSchedule,
+  DEFAULT_CREDITS_PER_SUBJECT,
   DEFAULT_GRADING_SCALE,
   gradingScaleSchema,
   type AssessmentSchemesInput,
@@ -21,6 +22,7 @@ import type { AuthUser } from '../common/auth-user';
 import { AuditService } from '../common/audit.service';
 import { clientIp, CurrentUser, Public, RequirePermissions } from '../common/decorators';
 import { ZodPipe } from '../common/zod.pipe';
+import { regradeResults } from '../results/regrade';
 
 @Controller('school')
 export class SchoolController {
@@ -52,6 +54,7 @@ export class SchoolController {
       address: body.address ?? null,
       phone: body.phone ?? null,
       email: body.email ?? null,
+      gpsAddress: body.gpsAddress ?? null,
       website: body.website ?? null,
       logoUrl: body.logoUrl ?? null,
     };
@@ -63,7 +66,9 @@ export class SchoolController {
   @Get('grading-scale')
   async gradingScale(): Promise<GradingScaleInput> {
     const [row] = await this.db.select({ g: schoolProfile.gradingScale }).from(schoolProfile).where(eq(schoolProfile.id, 1));
-    return row?.g ?? { bands: DEFAULT_GRADING_SCALE };
+    const g = row?.g ?? { bands: DEFAULT_GRADING_SCALE };
+    // Scales saved before GPA points existed read as 0 until the school fills them in.
+    return { bands: g.bands.map((b) => ({ ...b, gpa: b.gpa ?? 0 })), creditsPerSubject: g.creditsPerSubject ?? DEFAULT_CREDITS_PER_SUBJECT };
   }
 
   @RequirePermissions('school:manage')
@@ -71,7 +76,9 @@ export class SchoolController {
   async setGradingScale(@CurrentUser() user: AuthUser, @Body(new ZodPipe(gradingScaleSchema)) body: GradingScaleInput, @Req() req: Request) {
     const updated = await this.db.update(schoolProfile).set({ gradingScale: body }).where(eq(schoolProfile.id, 1)).returning({ id: schoolProfile.id });
     if (!updated.length) throw new NotFoundException('Set up the school profile first');
-    await this.audit.record({ actorId: user.id, action: 'school.grading_scale_updated', entityType: 'school', entityId: '1', metadata: body as unknown as Record<string, unknown>, ip: clientIp(req) });
+    // Marks not yet published are regraded on the new scale; published results stay as issued.
+    const regraded = await regradeResults(this.db, body.bands);
+    await this.audit.record({ actorId: user.id, action: 'school.grading_scale_updated', entityType: 'school', entityId: '1', metadata: { ...body, regraded } as unknown as Record<string, unknown>, ip: clientIp(req) });
     return body;
   }
 
