@@ -562,6 +562,28 @@ export const results = pgTable(
   ],
 );
 
+/** Report card remarks for a student in a semester, written by the form master and the head. */
+export const reportRemarks = pgTable(
+  'report_remarks',
+  {
+    id: id(),
+    studentId: uuid('student_id')
+      .notNull()
+      .references(() => students.id, { onDelete: 'cascade' }),
+    termId: uuid('term_id')
+      .notNull()
+      .references(() => terms.id, { onDelete: 'restrict' }),
+    conduct: text('conduct'),
+    attitude: text('attitude'),
+    interest: text('interest'),
+    formMasterRemark: text('form_master_remark'),
+    headRemark: text('head_remark'),
+    updatedBy: uuid('updated_by').references(() => users.id, { onDelete: 'set null' }),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex('report_remarks_student_term').on(t.studentId, t.termId)],
+);
+
 // ── Audit ───────────────────────────────────────────────────────────────────
 
 export const auditLogs = pgTable(

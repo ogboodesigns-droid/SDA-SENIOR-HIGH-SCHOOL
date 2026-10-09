@@ -13,6 +13,7 @@ const NAV: { href: string; label: string; permission?: Permission }[] = [
   { href: '/announcements', label: 'Announcements', permission: 'announcements:publish' },
   { href: '/assignments', label: 'Assignments', permission: 'assignments:manage' },
   { href: '/results', label: 'Results', permission: 'results:enter' },
+  { href: '/reports', label: 'Report cards', permission: 'results:enter' },
   { href: '/events', label: 'Calendar', permission: 'events:manage' },
   { href: '/timetable', label: 'Timetable', permission: 'timetable:manage' },
   { href: '/users', label: 'People', permission: 'users:read' },

@@ -426,3 +426,17 @@ export const publishResultsSchema = z.object({
   subjectId: uuid.optional(),
 });
 export type PublishResultsInput = z.infer<typeof publishResultsSchema>;
+
+const remarkText = (max: number) => z.string().trim().max(max).nullish().transform((v) => (v ? v : null));
+
+/** Report card remarks; omitted fields are left as they are. */
+export const reportRemarksSchema = z.object({
+  termId: z.uuid(),
+  studentId: z.uuid(),
+  conduct: remarkText(80).optional(),
+  attitude: remarkText(80).optional(),
+  interest: remarkText(80).optional(),
+  formMasterRemark: remarkText(400).optional(),
+  headRemark: remarkText(400).optional(),
+});
+export type ReportRemarksInput = z.infer<typeof reportRemarksSchema>;

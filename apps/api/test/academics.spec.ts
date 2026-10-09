@@ -147,4 +147,63 @@ describe('classes, grading and transcripts', () => {
     expect(byTerm(seed.term.id, 'Biology')).toMatchObject({ grade: 'C6' }); // published: unchanged
     await http().put('/api/v1/school/grading-scale').set(auth).send(scale).expect(200);
   });
+  describe('report cards', () => {
+    const get = (token: string, path: string) => http().get(`/api/v1/reports${path}`).set({ authorization: `Bearer ${token}` });
+    let student: string;
+    let parent: string;
+    let teacherB: string;
+    let term2Id: string;
+
+    beforeAll(async () => {
+      student = (await login(app, 'student.a@test.local')).accessToken;
+      parent = (await login(app, 'parent.a@test.local')).accessToken;
+      teacherB = (await login(app, 'teacher.b@test.local')).accessToken;
+      const terms = await db.select().from(schema.terms);
+      term2Id = terms.find((t) => t.semester === 2)!.id;
+    });
+
+    it("shows the student's published semester with component marks, GPA and aggregate", async () => {
+      const res = await get(student, `/mine?termId=${seed.term.id}`).expect(200);
+      expect(res.body.components.map((c: { weight: number }) => c.weight)).toEqual([15, 15, 10, 20, 40]);
+      expect(res.body.subjects).toHaveLength(6);
+      // Core subjects first.
+      expect(res.body.subjects.slice(0, 3).every((s: { isCore: boolean }) => s.isCore)).toBe(true);
+      expect(res.body.summary).toMatchObject({ subjects: 6, gpa: 2.4, aggregate: 25 });
+      expect(res.body).toMatchObject({ draft: false, classSize: 1, term: { semester: 1, nextTermBegins: '2027-01-10' } });
+      expect(res.body.student).toMatchObject({ groupName: '2 Science A', form: 2 });
+
+      // A parent sees their child's; nothing is shown for a semester with no published marks.
+      await get(parent, `/mine?termId=${seed.term.id}&studentId=${seed.studentA.id}`).expect(200);
+      await get(student, `/mine?termId=${term2Id}`).expect(404);
+    });
+
+    it('lets the form master preview marks not yet published, marked as a draft', async () => {
+      const res = await get(teacherA, `/student/${seed.studentA.id}?termId=${term2Id}`).expect(200);
+      expect(res.body).toMatchObject({ draft: true, summary: { subjects: 1 } });
+      // Another teacher is not this class's form master.
+      await get(teacherB, `/student/${seed.studentA.id}?termId=${term2Id}`).expect(404);
+      const cls = await get(head, `/class/${seed.classA.id}?termId=${seed.term.id}`).expect(200);
+      expect(cls.body.map((c: { student: { id: string } }) => c.student.id)).toContain(seed.studentA.id);
+      await get(teacherB, `/class/${seed.classA.id}?termId=${seed.term.id}`).expect(404);
+    });
+
+    it("takes the form master's remarks and the head's remark, each from the right person", async () => {
+      const put = (token: string, body: object) =>
+        http()
+          .put('/api/v1/reports/remarks')
+          .set({ authorization: `Bearer ${token}` })
+          .send({ termId: seed.term.id, studentId: seed.studentA.id, ...body });
+
+      await put(teacherA, { conduct: 'Good', interest: 'Football', formMasterRemark: 'Hardworking; keep it up.' }).expect(200);
+      await put(teacherA, { headRemark: 'Well done.' }).expect(403);
+      await put(teacherB, { conduct: 'Poor' }).expect(403);
+      await put(student, { conduct: 'Excellent' }).expect(403);
+      const saved = await put(head, { headRemark: 'Well done.' }).expect(200);
+      // Fields not sent are left as they were.
+      expect(saved.body).toEqual({ conduct: 'Good', attitude: null, interest: 'Football', formMasterRemark: 'Hardworking; keep it up.', headRemark: 'Well done.' });
+
+      const card = await get(student, `/mine?termId=${seed.term.id}`).expect(200);
+      expect(card.body.remarks).toMatchObject({ formMasterRemark: 'Hardworking; keep it up.', headRemark: 'Well done.' });
+    });
+  });
 });

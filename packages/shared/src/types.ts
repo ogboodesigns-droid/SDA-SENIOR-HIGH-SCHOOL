@@ -384,3 +384,50 @@ export interface Transcript {
   gradeInterpretation: { grade: string; gpa: number; min: number; max: number; remark: string }[];
   generatedAt: string;
 }
+
+export interface ReportRemarks {
+  conduct: string | null;
+  attitude: string | null;
+  interest: string | null;
+  formMasterRemark: string | null;
+  headRemark: string | null;
+}
+
+export interface ReportCardSubject {
+  subjectName: string;
+  isCore: boolean;
+  /** Mark per assessment component, in the order of `ReportCard.components`. */
+  scores: (number | null)[];
+  total: number;
+  grade: string;
+  gpa: number;
+  remark: string;
+  teacherComment: string | null;
+  published: boolean;
+}
+
+/** One student's terminal report for a semester. */
+export interface ReportCard {
+  school: { name: string; motto: string | null; address: string | null; phone: string | null; email: string | null; logoUrl: string | null };
+  term: { id: string; name: string; semester: 1 | 2; academicYearName: string; endsOn: string; nextTermBegins: string | null };
+  student: {
+    id: string;
+    name: string;
+    admissionNo: string;
+    className: string;
+    groupName: string;
+    programmeName: string;
+    form: number;
+    houseName: string | null;
+    gender: string | null;
+  };
+  formMasterName: string | null;
+  /** Number of students in the class. */
+  classSize: number;
+  components: { key: string; label: string; weight: number }[];
+  subjects: ReportCardSubject[];
+  summary: { subjects: number; average: number | null; gpa: number | null; aggregate: number | null; totalMarks: number };
+  remarks: ReportRemarks;
+  /** True when some marks shown are not yet published (staff preview only). */
+  draft: boolean;
+}

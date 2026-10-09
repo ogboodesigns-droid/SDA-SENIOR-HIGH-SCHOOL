@@ -1,5 +1,5 @@
 import { View } from 'react-native';
-import { shortLabel, type ResultRow } from '@sda-shs/shared';
+import { shortLabel, type ReportCard, type ResultRow } from '@sda-shs/shared';
 import { useStudentQuery } from '@/lib/auth';
 import { colors } from '@/lib/theme';
 import { useQuery } from '@/lib/useQuery';
@@ -18,8 +18,39 @@ function gradeTone(points: number): 'ok' | 'brand' | 'warn' | 'danger' {
   return 'danger';
 }
 
+/** The form master's and head's remarks from the semester's report card, once written. */
+function ReportRemarks({ termId, studentQuery }: { termId: string; studentQuery: string }) {
+  const report = useQuery<ReportCard>(`/reports/mine${studentQuery ? `${studentQuery}&` : '?'}termId=${termId}`);
+  const r = report.data?.remarks;
+  if (!r || !Object.values(r).some(Boolean)) return null;
+  const traits = [
+    ['Conduct', r.conduct],
+    ['Attitude', r.attitude],
+    ['Interest', r.interest],
+  ].filter(([, v]) => v);
+  return (
+    <Card>
+      <Title>Report remarks</Title>
+      {traits.length > 0 && <Body muted>{traits.map(([k, v]) => `${k}: ${v}`).join(' · ')}</Body>}
+      {r.formMasterRemark && (
+        <Body>
+          <Body style={{ fontWeight: '700' }}>Form master: </Body>
+          {r.formMasterRemark}
+        </Body>
+      )}
+      {r.headRemark && (
+        <Body>
+          <Body style={{ fontWeight: '700' }}>Head of school: </Body>
+          {r.headRemark}
+        </Body>
+      )}
+    </Card>
+  );
+}
+
 export default function ResultsScreen() {
-  const results = useQuery<ResultsResponse>(`/results/mine${useStudentQuery()}`);
+  const studentQuery = useStudentQuery();
+  const results = useQuery<ResultsResponse>(`/results/mine${studentQuery}`);
 
   return (
     <Screen refreshing={results.refreshing} onRefresh={results.refresh}>
@@ -39,6 +70,7 @@ export default function ResultsScreen() {
             </Body>
             {t.aggregate !== null && <Body>Aggregate (best 3 core + best 3 electives): {t.aggregate}</Body>}
           </Card>
+          <ReportRemarks termId={t.termId} studentQuery={studentQuery} />
           {results
             .data!.rows.filter((r) => r.termId === t.termId)
             .map((r) => (

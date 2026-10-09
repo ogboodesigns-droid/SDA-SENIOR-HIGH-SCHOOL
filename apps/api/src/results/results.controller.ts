@@ -1,12 +1,20 @@
 import { Body, Controller, Get, HttpCode, Module, Param, ParseUUIDPipe, Post, Put, Query, Req } from '@nestjs/common';
 import { z } from 'zod';
-import { publishResultsSchema, resultEntrySchema, type PublishResultsInput, type ResultEntryInput } from '@sda-shs/shared';
+import {
+  publishResultsSchema,
+  reportRemarksSchema,
+  resultEntrySchema,
+  type PublishResultsInput,
+  type ReportRemarksInput,
+  type ResultEntryInput,
+} from '@sda-shs/shared';
 import type { Request } from 'express';
 import type { AuthUser } from '../common/auth-user';
 import { clientIp, CurrentUser, RequirePermissions } from '../common/decorators';
 import { ZodPipe } from '../common/zod.pipe';
 import { AuditService } from '../common/audit.service';
 import { ResultsService } from './results.service';
+import { ReportsService } from './reports.service';
 import { TranscriptService } from './transcript.service';
 
 const sheetQuery = z.object({ termId: z.uuid(), classId: z.uuid(), subjectId: z.uuid() });
@@ -60,5 +68,34 @@ export class ResultsController {
   }
 }
 
-@Module({ controllers: [ResultsController], providers: [ResultsService, TranscriptService], exports: [ResultsService] })
+const termQuery = z.object({ termId: z.uuid(), studentId: z.uuid().optional() });
+
+/** Terminal report cards and their remarks. */
+@Controller('reports')
+export class ReportsController {
+  constructor(private readonly reports: ReportsService) {}
+
+  /** A student's own report (or a parent's child's: pass studentId). */
+  @Get('mine')
+  mine(@CurrentUser() user: AuthUser, @Query(new ZodPipe(termQuery)) q: z.infer<typeof termQuery>) {
+    return this.reports.forStudent(user, q.termId, q.studentId);
+  }
+
+  @Get('student/:studentId')
+  student(@CurrentUser() user: AuthUser, @Param('studentId', ParseUUIDPipe) studentId: string, @Query('termId', new ZodPipe(z.uuid())) termId: string) {
+    return this.reports.forStudent(user, termId, studentId);
+  }
+
+  @Get('class/:classId')
+  forClass(@CurrentUser() user: AuthUser, @Param('classId', ParseUUIDPipe) classId: string, @Query('termId', new ZodPipe(z.uuid())) termId: string) {
+    return this.reports.forClass(user, termId, classId);
+  }
+
+  @Put('remarks')
+  remarks(@CurrentUser() user: AuthUser, @Body(new ZodPipe(reportRemarksSchema)) body: ReportRemarksInput, @Req() req: Request) {
+    return this.reports.saveRemarks(user, body, clientIp(req));
+  }
+}
+
+@Module({ controllers: [ResultsController, ReportsController], providers: [ResultsService, TranscriptService, ReportsService], exports: [ResultsService] })
 export class ResultsModule {}

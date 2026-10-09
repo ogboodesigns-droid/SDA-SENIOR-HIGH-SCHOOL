@@ -18,6 +18,7 @@ The product specification is split into three releases. V1 is built in this repo
 | Assignments (§9) | ✅ | Text and file submissions, late flag, marking with feedback |
 | Results (§10) | ✅ | Marks per assessment mode (15/15/10/20/40), WASSCE grade and grade point, remark, comment, publish workflow (complete results only), semester average and aggregate. *Class position* is not computed until the school confirms its policy |
 | Bulk import (from V2) | ✅ | Student registration sheet with SDA/YY/NNNN admission numbers, guardian accounts, printable sign-in slips; score sheet download/upload |
+| Report cards (§10) | ✅ | Per semester; form master and head remarks; print a whole class; remarks in the app. Attendance will be added to the card once attendance is built |
 | Official transcript (§10) | ✅ | School layout with semester GPA and grade per subject, cumulative GPA, credits earned, grade interpretation; printable |
 | School calendar (§16) | ✅ | Audience-targeted events |
 | Push notifications (§28) | ✅ | Expo push; targeted by school, role, form, programme, class, student and guardians |
