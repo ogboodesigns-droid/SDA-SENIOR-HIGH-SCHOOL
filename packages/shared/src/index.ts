@@ -6,3 +6,4 @@ export * from './assessment';
 export * from './timetable';
 export * from './schemas';
 export * from './types';
+export * from './colour';

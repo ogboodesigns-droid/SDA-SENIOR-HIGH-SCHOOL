@@ -51,7 +51,7 @@ The product specification is split into three releases. V1 is built in this repo
 
 - ~~Official name, logo, motto, address~~ ✅ provided. Still needed: vision, mission, core values, history, phone/email and leadership
 - ~~Grading scale and assessment modes~~ ✅ WASSCE; 15/15/10/20/40. Still needed: whether class positions are published, and which scale is official — the WASSCE table given (A1 75–100), the score sheet template (A1 80–100, B3 65–69) or the transcript (A1 80–100 with a 4.0 GPA). The scale is editable under School profile
-- ~~Houses~~ ✅ Gye Nyame, Asokore, Agyei Sarfo, Kuma Korante. Optional: house colours and house masters/mistresses
+- ~~Houses~~ ✅ Gye Nyame (green), Asokore (red), Agyei Sarfo (blue), Kuma Korante (yellow). Optional: house masters/mistresses
 - ~~Programme codes, options, subjects, classes per form~~ ✅ (same classes and options for SHS 1–3; Languages written "1 LANG 1A")
 - Teacher accounts for the staff on the timetables, so they can be assigned to class subjects (`db:sample-timetables` prints the list)
 - Subjects and teacher assignments; academic calendar

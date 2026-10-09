@@ -43,6 +43,13 @@
       "when": 1791460771348,
       "tag": "0005_student_registration",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791517117175,
+      "tag": "0006_house_colours",
+      "breakpoints": true
     }
   ]
 }

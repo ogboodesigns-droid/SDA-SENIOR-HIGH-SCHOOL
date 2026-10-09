@@ -1,7 +1,7 @@
 'use client';
 
 import { use, useState } from 'react';
-import { ROLE_LABELS, type House, type Me, type Paginated, type SubjectChoice, type SubjectCombination, type UserListItem } from '@sda-shs/shared';
+import { ROLE_LABELS, textOn, type House, type Me, type Paginated, type SubjectChoice, type SubjectCombination, type UserListItem } from '@sda-shs/shared';
 import { api, formatDate, useApi } from '@/lib/api';
 import { useCan } from '@/lib/me';
 import { Alert, Card, Field, Loading, PageHeader, useSubmit } from '@/components/ui';
@@ -146,7 +146,16 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
               </div>
               <div>
                 <div className="field-label">House</div>
-                {u.student.houseName ?? '—'}
+                {(() => {
+                  const colour = houses.data?.find((h) => h.id === u.student!.houseId)?.colour;
+                  return u.student.houseName ? (
+                    <span className="house-chip" style={colour ? { background: colour, color: textOn(colour) } : undefined}>
+                      {u.student.houseName}
+                    </span>
+                  ) : (
+                    '—'
+                  );
+                })()}
               </div>
               {(u.student.droppedSubjectName || choice.data?.required) && (
                 <div>

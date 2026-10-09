@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import type { House } from '@sda-shs/shared';
-import { api, formatDate, useApi } from '@/lib/api';
+import { textOn, type House } from '@sda-shs/shared';
+import { api, errorMessage, formatDate, useApi } from '@/lib/api';
+import { useCan } from '@/lib/me';
 import { Alert, Card, Empty, Field, Loading, PageHeader, useSubmit } from '@/components/ui';
 
 interface PointEntry {
@@ -15,7 +16,19 @@ interface PointEntry {
 
 export default function HousesPage() {
   const houses = useApi<House[]>('/houses');
+  const canManage = useCan('houses:manage');
   const [selected, setSelected] = useState('');
+  const [colourError, setColourError] = useState<string | null>(null);
+
+  async function setColour(id: string, colour: string) {
+    setColourError(null);
+    try {
+      await api(`/houses/${id}`, { method: 'PATCH', body: { colour } });
+      await houses.reload();
+    } catch (e) {
+      setColourError(errorMessage(e));
+    }
+  }
   const history = useApi<PointEntry[]>(selected ? `/houses/${selected}/points` : null);
 
   const award = useSubmit(async (v, form) => {
@@ -38,6 +51,7 @@ export default function HousesPage() {
               <tr>
                 <th>#</th>
                 <th>House</th>
+                <th>Colour</th>
                 <th>Points</th>
                 <th>Students</th>
                 <th />
@@ -48,7 +62,22 @@ export default function HousesPage() {
                 <tr key={h.id}>
                   <td>{i + 1}</td>
                   <td>
-                    <strong>{h.name}</strong>
+                    <span className="house-chip" style={h.colour ? { background: h.colour, color: textOn(h.colour) } : undefined}>
+                      {h.name}
+                    </span>
+                  </td>
+                  <td>
+                    {canManage ? (
+                      <input
+                        type="color"
+                        aria-label={`${h.name} colour`}
+                        defaultValue={h.colour ?? '#a00561'}
+                        onBlur={(e) => e.target.value !== h.colour && void setColour(h.id, e.target.value)}
+                        className="colour-input"
+                      />
+                    ) : (
+                      (h.colour ?? '—')
+                    )}
                   </td>
                   <td>{h.points}</td>
                   <td>{h.members}</td>
@@ -62,6 +91,7 @@ export default function HousesPage() {
             </tbody>
           </table>
         )}
+        <Alert>{colourError}</Alert>
       </Card>
 
       <Card title="Award or deduct points">

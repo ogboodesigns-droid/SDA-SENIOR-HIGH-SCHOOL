@@ -7,7 +7,7 @@
  * Subject codes are internal identifiers chosen for the system; the names are
  * as printed on the combination list.
  */
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { className } from '@sda-shs/shared';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from './schema';
@@ -155,7 +155,14 @@ export const PROGRAMMES: ProgrammeDef[] = [
   },
 ];
 
-export const HOUSES = ['Gye Nyame', 'Asokore', 'Agyei Sarfo', 'Kuma Korante'];
+/** The school's four houses and their colours. */
+export const HOUSE_COLOURS: Record<string, string> = {
+  'Gye Nyame': '#1e8e3e', // green
+  Asokore: '#c8102e', // red
+  'Agyei Sarfo': '#1f5fbf', // blue
+  'Kuma Korante': '#f2c200', // yellow
+};
+export const HOUSES = Object.keys(HOUSE_COLOURS);
 
 export async function loadSchoolCatalogue(db: Db) {
   await db
@@ -202,8 +209,12 @@ export async function loadSchoolCatalogue(db: Db) {
 
   await db
     .insert(schema.houses)
-    .values(HOUSES.map((name) => ({ name })))
+    .values(HOUSES.map((name) => ({ name, colour: HOUSE_COLOURS[name] })))
     .onConflictDoNothing();
+  // Houses created before colours were known get theirs; colours changed in the portal are kept.
+  for (const name of HOUSES) {
+    await db.update(schema.houses).set({ colour: HOUSE_COLOURS[name] }).where(and(eq(schema.houses.name, name), isNull(schema.houses.colour)));
+  }
 
   const counts = {
     subjects: subjectRows.length,
